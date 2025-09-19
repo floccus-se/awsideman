@@ -1,0 +1,79 @@
+# Gitleaks configuration for awsideman
+# This file customizes what secrets and sensitive data Gitleaks will detect
+
+title = "awsideman secrets detection"
+
+# Global settings
+[extend]
+useDefault = true
+
+# Custom rules for awsideman-specific sensitive data
+[[rules]]
+id = "awsideman-email-addresses"
+description = "Email addresses in code or documentation"
+regex = '''[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'''
+tags = ["email", "pii"]
+entropy = 0
+
+[[rules]]
+id = "awsideman-real-profile-names"
+description = "Real AWS profile names (not test profiles)"
+regex = '''profile\s*[=:]\s*["']?[a-zA-Z0-9_-]+["']?'''
+tags = ["aws", "profile", "sensitive"]
+entropy = 0
+
+[[rules]]
+id = "awsideman-real-account-ids"
+description = "Real AWS account IDs (12-digit numbers)"
+regex = '''\b[0-9]{12}\b'''
+tags = ["aws", "account-id", "sensitive"]
+entropy = 0
+
+[[rules]]
+id = "awsideman-real-arns"
+description = "Real AWS ARNs with account IDs"
+regex = '''arn:aws:[^:]+:[^:]*:[^:]*:[0-9]{12}:'''
+tags = ["aws", "arn", "sensitive"]
+entropy = 0
+
+[[rules]]
+id = "awsideman-real-instance-ids"
+description = "Real AWS instance IDs"
+regex = '''\bi-[0-9a-f]{17}\b'''
+tags = ["aws", "instance", "sensitive"]
+entropy = 0
+
+[[rules]]
+id = "awsideman-real-bucket-names"
+description = "Real S3 bucket names"
+regex = '''bucket[=:]\s*["']?[a-z0-9.-]{3,63}["']?'''
+tags = ["aws", "s3", "bucket", "sensitive"]
+entropy = 0
+
+[[rules]]
+id = "awsideman-real-region-names"
+description = "Real AWS region names (not test regions)"
+regex = '''region[=:]\s*["']?[a-z0-9-]+["']?'''
+tags = ["aws", "region", "sensitive"]
+entropy = 0
+
+[[rules]]
+id = "awsideman-real-user-names"
+description = "Real usernames (not test users)"
+regex = '''username[=:]\s*["']?[a-zA-Z0-9._-]+["']?'''
+tags = ["username", "pii", "sensitive"]
+entropy = 0
+
+[[rules]]
+id = "awsideman-real-group-names"
+description = "Real group names (not test groups)"
+regex = '''group[=:]\s*["']?[a-zA-Z0-9._-]+["']?'''
+tags = ["group", "pii", "sensitive"]
+entropy = 0
+
+[[rules]]
+id = "awsideman-real-permission-set-names"
+description = "Real permission set names (not test permission sets)"
+regex = '''permission[_-]?set[=:]\s*["']?[a-zA-Z0-9._-]+["']?'''
+tags = ["permission-set", "sensitive"]
+entropy = 0

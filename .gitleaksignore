@@ -1,0 +1,9 @@
+# Gitleaks ignore file
+# Add fingerprints of known false positives here
+# To get a fingerprint, run: gitleaks detect --verbose
+# Then copy the fingerprint from the output and add it here
+
+# Example format:
+# 7ef7dc00583b3fcf88916ab2567e4a43cac3ade8:src/awsideman/utils/example.py:awsideman-email-addresses:5
+
+# Add your false positive fingerprints below this line
