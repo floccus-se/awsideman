@@ -7,3 +7,7 @@
 # 7ef7dc00583b3fcf88916ab2567e4a43cac3ade8:src/awsideman/utils/example.py:awsideman-email-addresses:5
 
 # Add your false positive fingerprints below this line
+
+# Documentation examples (safe test data)
+docs/security-gitleaks.md:awsideman-email-addresses:118
+docs/security-gitleaks.md:awsideman-real-account-ids:120
