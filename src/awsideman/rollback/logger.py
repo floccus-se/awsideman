@@ -32,8 +32,8 @@ class OperationLogger:
             config = Config()
             rollback_config = config.get_rollback_config()
 
-            # Always use configured storage directory if available and rollback is enabled
-            if rollback_config.get("enabled", True):
+            # An explicit directory takes precedence over configuration defaults.
+            if storage_directory is None and rollback_config.get("enabled", True):
                 configured_storage = rollback_config.get("storage_directory")
                 if configured_storage:
                     storage_directory = configured_storage

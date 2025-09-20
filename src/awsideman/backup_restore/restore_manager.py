@@ -5,9 +5,11 @@ This module provides comprehensive restore functionality including conflict reso
 compatibility validation, and dry-run capabilities for Identity Center configurations.
 """
 
+import asyncio
+import inspect
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from uuid import uuid4
 
 from ..aws_clients import AWSClientManager, CachedIdentityCenterClient, CachedIdentityStoreClient
@@ -36,6 +38,16 @@ from .monitoring import BackupMonitor
 from .performance import PerformanceOptimizer
 
 logger = logging.getLogger(__name__)
+
+
+async def _call_aws(method: Callable[..., Any], **kwargs: Any) -> Any:
+    """Run synchronous AWS clients off the event loop, also supporting async clients."""
+    if inspect.iscoroutinefunction(method):
+        return await method(**kwargs)
+    result = await asyncio.to_thread(method, **kwargs)
+    if inspect.isawaitable(result):
+        return await result
+    return result
 
 
 class ConflictResolver:
@@ -191,7 +203,9 @@ class CompatibilityValidator:
         """Validate access to the target Identity Center instance."""
         try:
             # Try to describe the instance
-            response = await self.identity_center_client.describe_instance(InstanceArn=instance_arn)
+            response = await _call_aws(
+                self.identity_center_client.describe_instance, InstanceArn=instance_arn
+            )
             return {"accessible": True, "instance_metadata": response}
         except Exception as e:
             logger.error(f"Cannot access instance {instance_arn}: {e}")
@@ -284,14 +298,16 @@ class CompatibilityValidator:
     async def _get_existing_permission_sets(self, instance_arn: str) -> List[Dict[str, Any]]:
         """Get existing permission sets from the target instance."""
         try:
-            response = await self.identity_center_client.list_permission_sets(
-                InstanceArn=instance_arn
+            response = await _call_aws(
+                self.identity_center_client.list_permission_sets, InstanceArn=instance_arn
             )
 
             permission_sets = []
             for ps_arn in response.get("PermissionSets", []):
-                ps_details = await self.identity_center_client.describe_permission_set(
-                    InstanceArn=instance_arn, PermissionSetArn=ps_arn
+                ps_details = await _call_aws(
+                    self.identity_center_client.describe_permission_set,
+                    InstanceArn=instance_arn,
+                    PermissionSetArn=ps_arn,
                 )
                 permission_sets.append(ps_details["PermissionSet"])
 
@@ -439,7 +455,7 @@ class RestoreProcessor:
         if self._identity_store_id is None:
             try:
                 # Use list_instances instead of describe_instance to avoid resource-based policy issues
-                response = await self.identity_center_client.list_instances()
+                response = await _call_aws(self.identity_center_client.list_instances)
                 instances = response.get("Instances", [])
 
                 logger.info(
@@ -469,6 +485,8 @@ class RestoreProcessor:
             except Exception as e:
                 logger.error(f"Failed to get identity store ID for instance {instance_arn}: {e}")
                 raise
+
+        return str(self._identity_store_id)
 
     def _calculate_total_steps(self, backup_data: BackupData, options: RestoreOptions) -> int:
         """Calculate total steps for progress reporting."""
@@ -763,17 +781,21 @@ class RestoreProcessor:
             identity_store_id = await self._get_identity_store_id(instance_arn)
 
             # Create user via Identity Store API
-            response = await self.identity_store_client.create_user(
-                IdentityStoreId=identity_store_id,
-                UserName=user.user_name,
-                DisplayName=user.display_name or user.user_name,
-                Emails=[{"Value": user.email, "Primary": True}] if user.email else [],
-                Name=(
-                    {"GivenName": user.given_name, "FamilyName": user.family_name}
-                    if user.given_name and user.family_name
-                    else None
-                ),
-            )
+            params: Dict[str, Any] = {
+                "IdentityStoreId": identity_store_id,
+                "UserName": user.user_name,
+                "DisplayName": user.display_name or user.user_name,
+            }
+            if user.email:
+                params["Emails"] = [{"Value": user.email, "Primary": True}]
+            name = {}
+            if user.given_name:
+                name["GivenName"] = user.given_name
+            if user.family_name:
+                name["FamilyName"] = user.family_name
+            if name:
+                params["Name"] = name
+            response = await _call_aws(self.identity_store_client.create_user, **params)
             return str(response["UserId"])
         except Exception as e:
             logger.error(f"Failed to create user {user.user_name}: {e}")
@@ -796,7 +818,8 @@ class RestoreProcessor:
             identity_store_id = await self._get_identity_store_id(instance_arn)
 
             # Create group via Identity Store API
-            response = await self.identity_store_client.create_group(
+            response = await _call_aws(
+                self.identity_store_client.create_group,
                 IdentityStoreId=identity_store_id,
                 DisplayName=group.display_name,
                 Description=group.description
@@ -823,7 +846,8 @@ class RestoreProcessor:
         """Create a new permission set."""
         try:
             # Create permission set via Identity Center API
-            response = await self.identity_center_client.create_permission_set(
+            response = await _call_aws(
+                self.identity_center_client.create_permission_set,
                 InstanceArn=instance_arn,
                 Name=ps.name,
                 Description=ps.description
@@ -853,7 +877,8 @@ class RestoreProcessor:
         """Create a new assignment."""
         try:
             # Create assignment via Identity Center API
-            await self.identity_center_client.create_account_assignment(
+            await _call_aws(
+                self.identity_center_client.create_account_assignment,
                 InstanceArn=instance_arn,
                 TargetId=assignment.account_id,
                 TargetType="AWS_ACCOUNT",

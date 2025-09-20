@@ -228,6 +228,25 @@ class PermissionCloningOperationRecord:
     rolled_back: bool = False
     rollback_operation_id: Optional[str] = None
 
+    def parsed_assignments(self) -> List[Dict[str, str]]:
+        """Decode copied assignment IDs without splitting the colons inside an ARN."""
+        assignments = []
+        for assignment_id in self.assignments_copied:
+            parts = assignment_id.rsplit(":", 2)
+            if len(parts) != 3 or not all(parts) or not parts[0].startswith("arn:"):
+                raise ValueError(f"Invalid copied assignment ID: {assignment_id}")
+            permission_set_arn, account_id, principal_id = parts
+            if principal_id != self.target_entity_id:
+                raise ValueError(f"Invalid copied assignment target: {assignment_id}")
+            assignments.append(
+                {
+                    "permission_set_arn": permission_set_arn,
+                    "account_id": account_id,
+                    "principal_id": principal_id,
+                }
+            )
+        return assignments
+
     @classmethod
     def create(
         cls,

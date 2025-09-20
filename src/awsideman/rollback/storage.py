@@ -77,9 +77,19 @@ class OperationStore:
         with open(self.rollbacks_file, "w") as f:
             json.dump(data, f, indent=2, default=str)
 
-    def store_operation(self, operation: OperationRecord) -> None:
-        """Store an operation record."""
+    def store_operation(
+        self,
+        operation: Union[
+            OperationRecord, PermissionCloningOperationRecord, PermissionSetCloningOperationRecord
+        ],
+    ) -> None:
+        """Store an operation record, replacing any previous version with the same ID."""
         data = self._read_operations_file()
+        data["operations"] = [
+            existing
+            for existing in data["operations"]
+            if existing["operation_id"] != operation.operation_id
+        ]
         data["operations"].append(operation.to_dict())
         self._write_operations_file(data)
 

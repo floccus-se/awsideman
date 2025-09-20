@@ -1,0 +1,373 @@
+AWS Identity Center Governance Report
+Generated: 2024-01-15 10:30:00 UTC
+Instance: arn:aws:sso:::instance/ssoins-xxxxxxxxxx
+Region: eu-north-1
+Profile: sso-test-1
+
+═══════════════════════════════════════════════════════════════
+GOVERNANCE EXECUTIVE SUMMARY
+═══════════════════════════════════════════════════════════════
+
+Security Posture Overview:
+• 2 privileged permission sets identified
+• 2 users with administrative access
+• 8 accounts with admin access coverage
+• 3 high-risk patterns detected
+• 4 compliance gaps requiring attention
+
+Access Distribution:
+• 245 users mapped across 12 accounts
+• 18 groups providing structured access
+• 24 permission sets defining access levels
+• 456 total assignments managing access
+
+Key Security Findings:
+⚠️  1 user has admin access to 8 accounts (high risk)
+⚠️  23 users have cross-account access (medium risk)
+⚠️  3 orphaned users without proper assignments
+⚠️  4 unused resources requiring cleanup
+
+═══════════════════════════════════════════════════════════════
+ACCESS MATRIX ANALYSIS
+═══════════════════════════════════════════════════════════════
+
+User-to-Account Access Patterns:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Access Pattern          │ Count       │ Risk Assessment         │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ Single-account users    │ 222         │ Low risk               │
+│ Multi-account users     │ 23          │ Medium risk            │
+│ Cross-account admins    │ 1           │ High risk              │
+│ Users without access    │ 3           │ Medium risk (orphaned) │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+Group-to-Account Access Patterns:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Access Pattern          │ Count       │ Risk Assessment         │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ Single-account groups   │ 10          │ Low risk               │
+│ Multi-account groups    │ 8           │ Medium risk            │
+│ Groups without access   │ 1           │ Low risk (cleanup)     │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+Permission Set Distribution:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Permission Set Type     │ Count       │ Usage Pattern          │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ Read-only access        │ 1           │ Widely used (89 assign)│
+│ Developer access        │ 3           │ Moderately used        │
+│ Power user access       │ 2           │ Selective use          │
+│ Administrative access   │ 2           │ Restricted use         │
+│ Specialized access      │ 13          │ Targeted use           │
+│ Unused permission sets  │ 3           │ Cleanup candidates     │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+PRIVILEGED ACCESS ANALYSIS
+═══════════════════════════════════════════════════════════════
+
+Administrative Permission Sets:
+┌─────────────────────────┬─────────────┬─────────────┬─────────────┐
+│ Permission Set          │ Assignments │ Accounts    │ Risk Level  │
+├─────────────────────────┼─────────────┼─────────────┼─────────────┤
+│ AdminAccess             │ 12          │ 8           │ High        │
+│ SecurityAuditor         │ 8           │ 5           │ Medium      │
+└─────────────────────────┴─────────────┴─────────────┴─────────────┘
+
+Users with Administrative Access:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ User                    │ Accounts    │ Permission Sets         │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ admin@company.com       │ 8           │ AdminAccess             │
+│ security.admin@...      │ 5           │ SecurityAuditor         │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+Groups with Administrative Access:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Group                   │ Accounts    │ Permission Sets         │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ Infrastructure-Team     │ 6           │ PowerUserAccess,        │
+│                         │             │ NetworkAdministrator    │
+│ Security-Team           │ 5           │ SecurityAuditor         │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+Accounts with Administrative Access:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Account                 │ Admin Users │ Admin Groups            │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ Production              │ 2           │ 2                       │
+│ Development             │ 2           │ 2                       │
+│ Staging                 │ 2           │ 2                       │
+│ Testing                 │ 2           │ 2                       │
+│ Security                │ 2           │ 2                       │
+│ Analytics               │ 1           │ 1                       │
+│ Backup                  │ 1           │ 1                       │
+│ Monitoring              │ 1           │ 1                       │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+HIGH-RISK PATTERNS DETECTED
+═══════════════════════════════════════════════════════════════
+
+🚨 Pattern 1: Cross-Account Administrative Access
+   User: admin@company.com
+   Risk Level: HIGH
+   Details:
+   • Has AdminAccess permission set
+   • Assigned to 8 different accounts
+   • Represents single point of failure
+   • High blast radius if compromised
+
+   Recommendations:
+   • Implement break-glass access model
+   • Consider account-specific admin roles
+   • Enable MFA and session monitoring
+   • Regular access review and rotation
+
+🚨 Pattern 2: Group Administrative Access
+   Group: Infrastructure-Team
+   Risk Level: MEDIUM
+   Details:
+   • Has PowerUserAccess and NetworkAdministrator
+   • Assigned to 6 different accounts
+   • Multiple users inherit broad access
+   • Potential for privilege escalation
+
+   Recommendations:
+   • Review group membership regularly
+   • Consider just-in-time access
+   • Implement approval workflows
+   • Monitor group assignment changes
+
+🚨 Pattern 3: Security Auditor Access Scope
+   Entity: Security-Team and security.admin@company.com
+   Risk Level: MEDIUM
+   Details:
+   • SecurityAuditor access to 5 accounts
+   • Broad read access across environments
+   • Potential for data exfiltration
+   • Critical for compliance monitoring
+
+   Recommendations:
+   • Implement audit logging for auditor access
+   • Regular review of auditor activities
+   • Separate auditor roles by environment
+   • Consider read-only snapshots for auditing
+
+═══════════════════════════════════════════════════════════════
+EMPTY MAPPINGS AND CLEANUP OPPORTUNITIES
+═══════════════════════════════════════════════════════════════
+
+Groups with No Members:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Group Name              │ Created     │ Recommendation          │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ Legacy-Team             │ 2023-01-15  │ Remove if no longer     │
+│                         │             │ needed                  │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+Permission Sets with No Assignments:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Permission Set          │ Created     │ Recommendation          │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ LegacyAdminAccess       │ 2022-06-15  │ Remove - superseded by  │
+│                         │             │ AdminAccess             │
+│ TempContractorAccess    │ 2023-08-20  │ Remove - contractor     │
+│                         │             │ engagement ended        │
+│ TestPermissionSet       │ 2023-12-01  │ Keep for testing or     │
+│                         │             │ remove if not needed    │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+Accounts with No Assignments:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Account                 │ Status      │ Recommendation          │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ Sandbox                 │ Active      │ Assign sandbox access   │
+│ (998877665544)          │             │ or remove from SSO      │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+COMPLIANCE GAPS ANALYSIS
+═══════════════════════════════════════════════════════════════
+
+Gap 1: Orphaned Resources
+Severity: MEDIUM
+Description: Resources without proper assignments or usage
+Affected Resources:
+• 3 orphaned users (no group membership or assignments)
+• 1 orphaned group (no members or assignments)
+• 3 unused permission sets
+• 1 unassigned account
+
+Impact:
+• Potential security gaps
+• Access management confusion
+• Resource waste and maintenance overhead
+
+Remediation:
+• Review orphaned users and determine appropriate action
+• Remove unused groups and permission sets
+• Assign resources to unassigned accounts or remove from management
+
+Gap 2: Excessive Privileges
+Severity: HIGH
+Description: Users or groups with admin access to multiple accounts
+Affected Resources:
+• admin@company.com (8 accounts with AdminAccess)
+• Infrastructure-Team (6 accounts with PowerUserAccess)
+
+Impact:
+• High blast radius in case of compromise
+• Violation of least privilege principle
+• Potential compliance violations
+
+Remediation:
+• Implement break-glass access model
+• Consider account-specific admin roles
+• Regular access reviews and justification
+• Implement just-in-time access
+
+Gap 3: Cross-Account Access Proliferation
+Severity: MEDIUM
+Description: Entities with access spanning multiple accounts
+Affected Resources:
+• 23 users with multi-account access
+• 8 groups with multi-account access
+
+Impact:
+• Complex access patterns
+• Difficult to audit and manage
+• Potential for lateral movement
+
+Remediation:
+• Regular review of cross-account access necessity
+• Implement account-specific roles where possible
+• Monitor cross-account activities
+• Document business justification for cross-account access
+
+Gap 4: Privileged Access Concentration
+Severity: MEDIUM
+Description: High concentration of privileged access in few entities
+Affected Resources:
+• Only 2 users with admin access
+• Only 2 groups with admin access
+
+Impact:
+• Single points of failure
+• Potential for service disruption
+• Limited administrative redundancy
+
+Remediation:
+• Consider additional admin users for redundancy
+• Implement emergency access procedures
+• Cross-train administrative personnel
+• Document administrative procedures
+
+═══════════════════════════════════════════════════════════════
+ACCESS GOVERNANCE RECOMMENDATIONS
+═══════════════════════════════════════════════════════════════
+
+Immediate Actions (0-30 days):
+1. 🔴 Review admin@company.com's cross-account admin access
+   • Assess business justification for 8-account access
+   • Consider implementing break-glass access
+   • Enable additional monitoring and alerting
+
+2. 🔴 Investigate and resolve orphaned users
+   • john.doe@company.com - determine if active employee
+   • temp.user@company.com - remove if temporary engagement ended
+   • contractor@company.com - verify contractor status
+
+3. 🔴 Clean up unused permission sets
+   • Remove LegacyAdminAccess (superseded)
+   • Remove TempContractorAccess (no longer needed)
+   • Evaluate TestPermissionSet necessity
+
+Short-term Actions (30-90 days):
+1. 🟡 Implement regular access reviews
+   • Monthly review of privileged access
+   • Quarterly review of cross-account access
+   • Semi-annual comprehensive access audit
+
+2. 🟡 Enhance access monitoring
+   • Implement alerting for admin access usage
+   • Monitor cross-account activities
+   • Track permission set assignment changes
+
+3. 🟡 Develop access governance policies
+   • Define criteria for cross-account access
+   • Establish approval workflows for privileged access
+   • Document emergency access procedures
+
+Long-term Actions (90+ days):
+1. 🟢 Implement just-in-time access
+   • Evaluate JIT solutions for admin access
+   • Implement time-bound permission assignments
+   • Develop automated access provisioning
+
+2. 🟢 Enhance security controls
+   • Implement conditional access policies
+   • Enhance MFA requirements for admin access
+   • Develop risk-based access controls
+
+3. 🟢 Establish continuous compliance monitoring
+   • Automated compliance gap detection
+   • Regular governance reporting
+   • Integration with security information systems
+
+═══════════════════════════════════════════════════════════════
+GOVERNANCE METRICS SUMMARY
+═══════════════════════════════════════════════════════════════
+
+Access Coverage:
+• Account Coverage: 91.7% (11 of 12 accounts have assignments)
+• User Coverage: 98.8% (242 of 245 users have assignments)
+• Group Coverage: 94.4% (17 of 18 groups have assignments)
+• Permission Set Utilization: 87.5% (21 of 24 permission sets used)
+
+Risk Distribution:
+• High Risk Entities: 1 (admin user with cross-account access)
+• Medium Risk Entities: 25 (multi-account users and groups)
+• Low Risk Entities: 237 (single-account users and standard groups)
+
+Compliance Status:
+• Compliant Resources: 91.2% (resources with proper assignments)
+• Non-Compliant Resources: 8.8% (orphaned or unused resources)
+• Critical Gaps: 2 (excessive privileges, orphaned resources)
+• Minor Gaps: 2 (unused resources, access concentration)
+
+Governance Maturity:
+• Access Management: Developing (structured but needs improvement)
+• Privilege Management: Basic (admin access exists but not optimized)
+• Monitoring & Auditing: Basic (manual processes, limited automation)
+• Policy Enforcement: Developing (some policies, inconsistent enforcement)
+
+═══════════════════════════════════════════════════════════════
+REPORT METADATA
+═══════════════════════════════════════════════════════════════
+
+Analysis Scope:
+• Focus: Governance and security analysis
+• Data Collection Duration: 15.3 seconds
+• Analysis Duration: 8.7 seconds
+• Total Processing Time: 24.0 seconds
+
+Data Sources:
+• AWS SSO Admin API (Permission sets and assignments)
+• AWS Identity Store API (Users and groups)
+• AWS Organizations API (Account information)
+
+Risk Assessment Methodology:
+• High Risk: Cross-account admin access, excessive privileges
+• Medium Risk: Multi-account access, privileged groups, orphaned resources
+• Low Risk: Single-account access, standard permissions, unused resources
+
+Report Generated By: awsideman statistics module v1.0.0
+Next Review Recommended: 2024-02-15 (30 days)
+
+For detailed remediation guidance, refer to the Statistics module documentation
+and AWS Identity Center security best practices.
+
+═══════════════════════════════════════════════════════════════
+END OF GOVERNANCE REPORT
+═══════════════════════════════════════════════════════════════

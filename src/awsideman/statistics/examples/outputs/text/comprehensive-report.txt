@@ -1,0 +1,303 @@
+AWS Identity Center Statistics Report
+Generated: 2024-01-15 10:30:00 UTC
+Instance: arn:aws:sso:::instance/ssoins-xxxxxxxxxx
+Region: eu-north-1
+Profile: sso-test-1
+
+═══════════════════════════════════════════════════════════════
+EXECUTIVE SUMMARY
+═══════════════════════════════════════════════════════════════
+
+Total Users:           245
+Total Groups:          18
+Total Permission Sets: 24
+Total Accounts:        12
+Total Assignments:     456
+
+Key Findings:
+• 3 orphaned users detected (no group membership or assignments)
+• 1 orphaned group found (no members)
+• 3 unused permission sets identified
+• 2 privileged permission sets with admin access
+• 23 users have cross-account access
+• 1 account has no assignments
+
+Growth Trends (vs. previous month):
+• Users: +2.9% (7 new users)
+• Groups: +5.9% (1 new group)
+• Permission Sets: +14.3% (3 new permission sets)
+• Assignments: +5.6% (24 new assignments)
+
+═══════════════════════════════════════════════════════════════
+USER AND GROUP ANALYSIS
+═══════════════════════════════════════════════════════════════
+
+User Distribution:
+┌─────────────────────────┬───────────┬─────────────┐
+│ Group Name              │ Users     │ Assignments │
+├─────────────────────────┼───────────┼─────────────┤
+│ Developers              │ 45        │ 67          │
+│ Operations              │ 32        │ 45          │
+│ Analysts                │ 28        │ 34          │
+│ Security                │ 15        │ 23          │
+│ Management              │ 12        │ 18          │
+│ Platform                │ 10        │ 15          │
+│ Data Science            │ 8         │ 12          │
+│ QA                      │ 6         │ 8           │
+│ DevOps                  │ 5         │ 12          │
+│ Infrastructure          │ 4         │ 10          │
+└─────────────────────────┴───────────┴─────────────┘
+
+Group Membership Patterns:
+• Average users per group: 13.6
+• Average groups per user: 1.8
+• Users in multiple groups: 45 (18.4%)
+• Users in single group: 197 (80.4%)
+• Users in no groups: 3 (1.2%)
+
+Orphaned Resources:
+┌─────────────────────────┬─────────────────────────────────────┐
+│ Resource Type           │ Details                             │
+├─────────────────────────┼─────────────────────────────────────┤
+│ Users without groups    │ john.doe@company.com                │
+│                         │ temp.user@company.com               │
+│ Users without           │ contractor@company.com              │
+│ assignments             │                                     │
+│ Groups without members  │ Legacy-Team (created 2023-01-15)   │
+└─────────────────────────┴─────────────────────────────────────┘
+
+Most Active Users:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ User                    │ Assignments │ Accounts                │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ admin@company.com       │ 12          │ 8 (cross-account)      │
+│ devops.lead@company.com │ 8           │ 6 (cross-account)      │
+│ security.admin@...      │ 7           │ 5 (cross-account)      │
+│ platform.engineer@...  │ 6           │ 4 (cross-account)      │
+│ data.scientist@...      │ 5           │ 3 (cross-account)      │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+PERMISSION SET ANALYSIS
+═══════════════════════════════════════════════════════════════
+
+Permission Set Usage:
+┌─────────────────────────┬─────────────┬───────────┬─────────────┐
+│ Permission Set          │ Assignments │ Accounts  │ Risk Level  │
+├─────────────────────────┼─────────────┼───────────┼─────────────┤
+│ ReadOnlyAccess          │ 89          │ 12        │ Low         │
+│ DeveloperAccess         │ 67          │ 8         │ Low         │
+│ DataAnalyst             │ 45          │ 6         │ Low         │
+│ PowerUserAccess         │ 34          │ 6         │ Medium      │
+│ NetworkAdministrator    │ 23          │ 4         │ Medium      │
+│ AdminAccess             │ 12          │ 8         │ High        │
+│ SecurityAuditor         │ 8           │ 5         │ Medium      │
+│ DatabaseAdmin           │ 6           │ 3         │ Medium      │
+└─────────────────────────┴─────────────┴───────────┴─────────────┘
+
+Permission Set Statistics:
+• Total permission sets: 24
+• Used permission sets: 21 (87.5%)
+• Unused permission sets: 3 (12.5%)
+• Average assignments per permission set: 19.0
+• Privileged permission sets: 2 (8.3%)
+
+Unused Permission Sets:
+• LegacyAdminAccess (created 2022-06-15, never assigned)
+• TempContractorAccess (created 2023-08-20, assignments removed)
+• TestPermissionSet (created 2023-12-01, for testing only)
+
+Privileged Access Analysis:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Permission Set          │ Assignments │ Privileged Policies     │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ AdminAccess             │ 12          │ AdministratorAccess     │
+│ SecurityAuditor         │ 8           │ SecurityAudit,          │
+│                         │             │ ReadOnlyAccess          │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+ACCOUNT COVERAGE ANALYSIS
+═══════════════════════════════════════════════════════════════
+
+Account Assignment Distribution:
+┌─────────────────────────┬─────────────┬───────────┬─────────────┐
+│ Account                 │ Assignments │ Users     │ Groups      │
+├─────────────────────────┼─────────────┼───────────┼─────────────┤
+│ Production              │ 45          │ 35        │ 8           │
+│ Development             │ 38          │ 28        │ 6           │
+│ Staging                 │ 22          │ 18        │ 5           │
+│ Testing                 │ 18          │ 15        │ 4           │
+│ Security                │ 15          │ 12        │ 3           │
+│ Analytics               │ 12          │ 10        │ 3           │
+│ Backup                  │ 8           │ 6         │ 2           │
+│ Monitoring              │ 5           │ 4         │ 2           │
+│ Logging                 │ 3           │ 2         │ 1           │
+│ Archive                 │ 2           │ 1         │ 1           │
+│ Demo                    │ 1           │ 1         │ 1           │
+│ Sandbox                 │ 0           │ 0         │ 0           │
+└─────────────────────────┴─────────────┴───────────┴─────────────┘
+
+Account Coverage Statistics:
+• Total accounts: 12
+• Accounts with assignments: 11 (91.7%)
+• Accounts without assignments: 1 (8.3%)
+• Average assignments per account: 15.7
+• Most covered account: Production (45 assignments)
+• Least covered account: Sandbox (0 assignments)
+
+Cross-Account Access Patterns:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Entity Type             │ Count       │ Details                 │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ Users with multi-       │ 23          │ 9.4% of all users      │
+│ account access          │             │                         │
+│ Groups with multi-      │ 8           │ 44.4% of all groups    │
+│ account access          │             │                         │
+│ Single-account users    │ 219         │ 89.4% of all users     │
+│ Single-account groups   │ 9           │ 50.0% of all groups    │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+ASSIGNMENT PATTERNS
+═══════════════════════════════════════════════════════════════
+
+Assignment Distribution:
+• Total assignments: 456
+• Average assignments per user: 2.3
+• Average assignments per group: 25.3
+• Users with most assignments: admin@company.com (12)
+• Groups with most assignments: Infrastructure-Team (15)
+
+Assignment Growth Trend:
+┌─────────────────────────┬─────────────┬─────────────┬─────────────┐
+│ Period                  │ Assignments │ Growth      │ Change      │
+├─────────────────────────┼─────────────┼─────────────┼─────────────┤
+│ 2023-12                 │ 432         │ -           │ -           │
+│ 2024-01                 │ 456         │ +5.6%       │ +24         │
+└─────────────────────────┴─────────────┴─────────────┴─────────────┘
+
+High-Activity Entities:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Entity                  │ Assignments │ Risk Assessment         │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ admin@company.com       │ 12          │ High (cross-account     │
+│                         │             │ admin access)           │
+│ devops.lead@company.com │ 8           │ Medium (infrastructure  │
+│                         │             │ access)                 │
+│ Infrastructure-Team     │ 15          │ Medium (broad access)   │
+│ Security-Team           │ 12          │ Medium (audit access)   │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+GOVERNANCE AND SECURITY ANALYSIS
+═══════════════════════════════════════════════════════════════
+
+Access Matrix Summary:
+• User → Account mappings: 245 users across 12 accounts
+• User → Permission Set mappings: 245 users across 24 permission sets
+• Group → Account mappings: 18 groups across 12 accounts
+• Group → Permission Set mappings: 18 groups across 24 permission sets
+
+Privileged Access Report:
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Category                │ Count       │ Details                 │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ Admin Permission Sets   │ 2           │ AdminAccess,            │
+│                         │             │ SecurityAuditor         │
+│ Users with Admin Access │ 2           │ admin@company.com,      │
+│                         │             │ security.admin@...      │
+│ Accounts with Admin     │ 8           │ 66.7% of all accounts  │
+│ Access                  │             │                         │
+│ Groups with Admin       │ 2           │ Infrastructure-Team,    │
+│ Access                  │             │ Security-Team           │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+High-Risk Patterns Detected:
+⚠️  Cross-Account Admin Access
+    • admin@company.com has admin access to 8 accounts
+    • Risk Level: HIGH
+    • Recommendation: Consider account-specific admin roles
+
+⚠️  Group Admin Access
+    • Infrastructure-Team has admin access to 6 accounts
+    • Risk Level: MEDIUM
+    • Recommendation: Review group membership and access scope
+
+⚠️  Privileged Access Concentration
+    • Only 2 users have admin access
+    • Risk Level: MEDIUM
+    • Recommendation: Consider additional admin users for redundancy
+
+Empty Mappings (Cleanup Candidates):
+┌─────────────────────────┬─────────────┬─────────────────────────┐
+│ Resource Type           │ Count       │ Items                   │
+├─────────────────────────┼─────────────┼─────────────────────────┤
+│ Groups with no members  │ 1           │ Legacy-Team             │
+│ Permission sets with    │ 3           │ LegacyAdminAccess,      │
+│ no assignments          │             │ TempContractorAccess,   │
+│                         │             │ TestPermissionSet       │
+│ Accounts with no        │ 1           │ Sandbox                 │
+│ assignments             │             │                         │
+└─────────────────────────┴─────────────┴─────────────────────────┘
+
+Compliance Gaps Identified:
+🔍 Orphaned Resources (Medium Priority)
+   • 3 users without proper group membership or assignments
+   • 1 group without members or assignments
+   • Impact: Potential security gaps and access confusion
+
+🔍 Unused Resources (Low Priority)
+   • 3 permission sets not being used
+   • 1 account with no assignments
+   • Impact: Resource waste and maintenance overhead
+
+🔍 Excessive Privileges (High Priority)
+   • 1 user with admin access to multiple accounts
+   • Impact: High blast radius in case of compromise
+
+═══════════════════════════════════════════════════════════════
+RECOMMENDATIONS
+═══════════════════════════════════════════════════════════════
+
+Immediate Actions (High Priority):
+1. Review admin@company.com's cross-account admin access
+2. Investigate orphaned users and determine if cleanup is needed
+3. Consider implementing break-glass access for admin operations
+
+Short-term Actions (Medium Priority):
+1. Clean up unused permission sets (LegacyAdminAccess, etc.)
+2. Review Legacy-Team group and remove if no longer needed
+3. Assign resources to Sandbox account or remove from management
+4. Review Infrastructure-Team's broad admin access scope
+
+Long-term Actions (Low Priority):
+1. Implement regular access reviews and cleanup processes
+2. Consider implementing just-in-time access for admin operations
+3. Establish access governance policies and automation
+4. Monitor assignment growth trends and plan for scaling
+
+═══════════════════════════════════════════════════════════════
+REPORT METADATA
+═══════════════════════════════════════════════════════════════
+
+Generation Details:
+• Data Collection Duration: 45.2 seconds
+• Analysis Duration: 12.8 seconds
+• Total Processing Time: 58.0 seconds
+• Categories Analyzed: All (users, groups, permission-sets, accounts, assignments, governance)
+• Filters Applied: None
+• Historical Comparison: Enabled (vs. 2023-12 backup)
+
+Data Sources:
+• AWS SSO Admin API (Identity Center)
+• AWS Identity Store API (Users and Groups)
+• AWS Organizations API (Account Information)
+• Historical Backup Data (2023-12-15)
+
+Report Generated By: awsideman statistics module v1.0.0
+For questions or support, refer to the Statistics module documentation.
+
+═══════════════════════════════════════════════════════════════
+END OF REPORT
+═══════════════════════════════════════════════════════════════

@@ -460,11 +460,11 @@ class TestAssignmentCopier:
 
         mock_sso_client.create_account_assignment.assert_called_once_with(
             InstanceArn="arn:aws:sso:::instance/test",
-            TargetId="user-123",
+            TargetId="123456789012",
             TargetType="AWS_ACCOUNT",
             PermissionSetArn="arn:aws:sso:::permissionSet/ssoins-123/ps-admin",
             PrincipalType="USER",
-            AccountId="123456789012",
+            PrincipalId="user-123",
         )
 
     def test_create_group_assignment_success(self, assignment_copier, mock_assignment_retriever):
@@ -481,11 +481,11 @@ class TestAssignmentCopier:
 
         mock_sso_client.create_account_assignment.assert_called_once_with(
             InstanceArn="arn:aws:sso:::instance/test",
-            TargetId="group-456",
+            TargetId="123456789012",
             TargetType="AWS_ACCOUNT",
             PermissionSetArn="arn:aws:sso:::permissionSet/ssoins-123/ps-admin",
             PrincipalType="GROUP",
-            AccountId="123456789012",
+            PrincipalId="group-456",
         )
 
     def test_create_user_assignment_failure(self, assignment_copier, mock_assignment_retriever):

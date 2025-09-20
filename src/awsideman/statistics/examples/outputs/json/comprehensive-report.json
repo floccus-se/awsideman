@@ -1,0 +1,307 @@
+{
+  "metadata": {
+    "generation_timestamp": "2024-01-15T10:30:00Z",
+    "instance_arn": "arn:aws:sso:::instance/ssoins-xxxxxxxxxx",
+    "region": "eu-north-1",
+    "profile": "sso-test-1",
+    "categories_included": [
+      "users",
+      "groups",
+      "permission-sets",
+      "accounts",
+      "assignments",
+      "governance"
+    ],
+    "filters_applied": {},
+    "data_collection_duration": 45.2,
+    "analysis_duration": 12.8
+  },
+  "user_group_metrics": {
+    "total_users": 245,
+    "total_groups": 18,
+    "users_per_group": {
+      "90d04f2e-xxxx-xxxx-xxxx-xxxxxxxxxxxx": 45,
+      "90d04f2e-yyyy-yyyy-yyyy-yyyyyyyyyyyy": 32,
+      "90d04f2e-zzzz-zzzz-zzzz-zzzzzzzzzzzz": 28,
+      "90d04f2e-aaaa-aaaa-aaaa-aaaaaaaaaaaa": 15,
+      "90d04f2e-bbbb-bbbb-bbbb-bbbbbbbbbbbb": 12
+    },
+    "groups_per_user": {
+      "90d04f2e-user-1111-1111-111111111111": 2,
+      "90d04f2e-user-2222-2222-222222222222": 1,
+      "90d04f2e-user-3333-3333-333333333333": 3,
+      "90d04f2e-user-4444-4444-444444444444": 1
+    },
+    "largest_groups": [
+      ["Developers", 45],
+      ["Operations", 32],
+      ["Analysts", 28],
+      ["Security", 15],
+      ["Management", 12]
+    ],
+    "orphaned_users": [
+      "90d04f2e-user-orphan1-xxxx-xxxxxxxxxxxx",
+      "90d04f2e-user-orphan2-yyyy-yyyyyyyyyyyy",
+      "90d04f2e-user-orphan3-zzzz-zzzzzzzzzzzz"
+    ],
+    "orphaned_groups": [
+      "90d04f2e-group-legacy-xxxx-xxxxxxxxxxxx"
+    ]
+  },
+  "permission_set_metrics": {
+    "total_permission_sets": 24,
+    "assignments_per_permission_set": {
+      "arn:aws:sso:::permissionSet/ssoins-xxxxxxxxxx/ps-readonlyaccess": 89,
+      "arn:aws:sso:::permissionSet/ssoins-xxxxxxxxxx/ps-developeraccess": 67,
+      "arn:aws:sso:::permissionSet/ssoins-xxxxxxxxxx/ps-dataanalyst": 45,
+      "arn:aws:sso:::permissionSet/ssoins-xxxxxxxxxx/ps-adminaccess": 12,
+      "arn:aws:sso:::permissionSet/ssoins-xxxxxxxxxx/ps-securityauditor": 8
+    },
+    "most_assigned_permission_sets": [
+      ["ReadOnlyAccess", 89],
+      ["DeveloperAccess", 67],
+      ["DataAnalyst", 45],
+      ["PowerUserAccess", 34],
+      ["NetworkAdministrator", 23]
+    ],
+    "unused_permission_sets": [
+      "LegacyAdminAccess",
+      "TempContractorAccess",
+      "TestPermissionSet"
+    ],
+    "average_assignments_per_permission_set": 19.0,
+    "privileged_permission_sets": [
+      "AdminAccess",
+      "SecurityAuditor"
+    ]
+  },
+  "account_metrics": {
+    "total_accounts": 12,
+    "assignments_per_account": {
+      "123456789012": 45,
+      "234567890123": 38,
+      "345678901234": 22,
+      "456789012345": 18,
+      "567890123456": 15,
+      "678901234567": 12,
+      "789012345678": 8,
+      "890123456789": 5,
+      "901234567890": 3,
+      "012345678901": 2,
+      "112233445566": 1,
+      "998877665544": 0
+    },
+    "users_per_account": {
+      "123456789012": 35,
+      "234567890123": 28,
+      "345678901234": 18,
+      "456789012345": 15,
+      "567890123456": 12,
+      "678901234567": 10,
+      "789012345678": 6,
+      "890123456789": 4,
+      "901234567890": 2,
+      "012345678901": 1,
+      "112233445566": 1,
+      "998877665544": 0
+    },
+    "groups_per_account": {
+      "123456789012": 8,
+      "234567890123": 6,
+      "345678901234": 5,
+      "456789012345": 4,
+      "567890123456": 3,
+      "678901234567": 3,
+      "789012345678": 2,
+      "890123456789": 2,
+      "901234567890": 1,
+      "012345678901": 1,
+      "112233445566": 1,
+      "998877665544": 0
+    },
+    "accounts_with_no_assignments": [
+      "998877665544"
+    ],
+    "cross_account_users": [
+      ["admin@company.com", 8],
+      ["devops.lead@company.com", 6],
+      ["security.admin@company.com", 5],
+      ["platform.engineer@company.com", 4],
+      ["data.scientist@company.com", 3]
+    ],
+    "cross_account_groups": [
+      ["Infrastructure-Team", 6],
+      ["Security-Team", 5],
+      ["Platform-Team", 4],
+      ["Data-Team", 3],
+      ["Management", 2]
+    ]
+  },
+  "assignment_patterns": {
+    "average_assignments_per_user": 2.3,
+    "users_with_most_assignments": [
+      ["admin@company.com", 12],
+      ["devops.lead@company.com", 8],
+      ["security.admin@company.com", 7],
+      ["platform.engineer@company.com", 6],
+      ["data.scientist@company.com", 5]
+    ],
+    "groups_with_most_assignments": [
+      ["Infrastructure-Team", 15],
+      ["Security-Team", 12],
+      ["Platform-Team", 10],
+      ["Data-Team", 8],
+      ["Management", 6]
+    ],
+    "assignment_growth_trend": {
+      "time_periods": ["2023-12", "2024-01"],
+      "values": [432, 456],
+      "trend_direction": "increasing"
+    }
+  },
+  "governance_view": {
+    "access_matrix": {
+      "user_to_accounts": {
+        "admin@company.com": ["123456789012", "234567890123", "345678901234", "456789012345", "567890123456", "678901234567", "789012345678", "890123456789"],
+        "devops.lead@company.com": ["123456789012", "234567890123", "345678901234", "456789012345", "567890123456", "678901234567"],
+        "security.admin@company.com": ["123456789012", "234567890123", "345678901234", "456789012345", "567890123456"],
+        "developer1@company.com": ["234567890123", "345678901234"],
+        "analyst1@company.com": ["123456789012", "234567890123"]
+      },
+      "user_to_permission_sets": {
+        "admin@company.com": ["AdminAccess", "ReadOnlyAccess"],
+        "devops.lead@company.com": ["PowerUserAccess", "ReadOnlyAccess"],
+        "security.admin@company.com": ["SecurityAuditor", "ReadOnlyAccess"],
+        "developer1@company.com": ["DeveloperAccess"],
+        "analyst1@company.com": ["DataAnalyst", "ReadOnlyAccess"]
+      },
+      "group_to_accounts": {
+        "Infrastructure-Team": ["123456789012", "234567890123", "345678901234", "456789012345", "567890123456", "678901234567"],
+        "Security-Team": ["123456789012", "234567890123", "345678901234", "456789012345", "567890123456"],
+        "Developers": ["234567890123", "345678901234"],
+        "Analysts": ["123456789012", "234567890123"]
+      },
+      "group_to_permission_sets": {
+        "Infrastructure-Team": ["PowerUserAccess", "NetworkAdministrator"],
+        "Security-Team": ["SecurityAuditor", "ReadOnlyAccess"],
+        "Developers": ["DeveloperAccess"],
+        "Analysts": ["DataAnalyst", "ReadOnlyAccess"]
+      },
+      "account_to_users": {
+        "123456789012": ["admin@company.com", "devops.lead@company.com", "security.admin@company.com", "analyst1@company.com"],
+        "234567890123": ["admin@company.com", "devops.lead@company.com", "security.admin@company.com", "developer1@company.com", "analyst1@company.com"],
+        "345678901234": ["admin@company.com", "devops.lead@company.com", "security.admin@company.com", "developer1@company.com"]
+      },
+      "account_to_groups": {
+        "123456789012": ["Infrastructure-Team", "Security-Team", "Analysts"],
+        "234567890123": ["Infrastructure-Team", "Security-Team", "Developers", "Analysts"],
+        "345678901234": ["Infrastructure-Team", "Security-Team", "Developers"]
+      }
+    },
+    "privileged_access_report": {
+      "admin_permission_sets": [
+        "AdminAccess",
+        "SecurityAuditor"
+      ],
+      "accounts_with_admin_access": {
+        "123456789012": ["admin@company.com", "Infrastructure-Team"],
+        "234567890123": ["admin@company.com", "Infrastructure-Team"],
+        "345678901234": ["admin@company.com", "Infrastructure-Team"],
+        "456789012345": ["admin@company.com", "Infrastructure-Team"],
+        "567890123456": ["admin@company.com", "Infrastructure-Team"]
+      },
+      "users_with_admin_access": [
+        "admin@company.com",
+        "devops.lead@company.com",
+        "security.admin@company.com"
+      ],
+      "high_privilege_patterns": [
+        {
+          "pattern_type": "cross_account_admin",
+          "description": "User has admin access across multiple accounts",
+          "affected_entities": ["admin@company.com"],
+          "risk_level": "high"
+        },
+        {
+          "pattern_type": "group_admin_access",
+          "description": "Group has admin access to multiple accounts",
+          "affected_entities": ["Infrastructure-Team"],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    "empty_mappings": {
+      "groups_with_no_members": [
+        "Legacy-Team"
+      ],
+      "permission_sets_with_no_assignments": [
+        "LegacyAdminAccess",
+        "TempContractorAccess",
+        "TestPermissionSet"
+      ],
+      "accounts_with_no_assignments": [
+        "998877665544"
+      ]
+    },
+    "compliance_gaps": [
+      {
+        "gap_type": "orphaned_resources",
+        "description": "Users and groups without proper assignments",
+        "affected_resources": ["3 users", "1 group"],
+        "severity": "medium"
+      },
+      {
+        "gap_type": "unused_resources",
+        "description": "Permission sets and accounts not being used",
+        "affected_resources": ["3 permission sets", "1 account"],
+        "severity": "low"
+      },
+      {
+        "gap_type": "excessive_privileges",
+        "description": "Users with admin access to multiple accounts",
+        "affected_resources": ["1 user"],
+        "severity": "high"
+      }
+    ]
+  },
+  "historical_comparison": {
+    "user_growth": {
+      "current_count": 245,
+      "previous_count": 238,
+      "growth_rate": 2.9,
+      "absolute_change": 7
+    },
+    "group_growth": {
+      "current_count": 18,
+      "previous_count": 17,
+      "growth_rate": 5.9,
+      "absolute_change": 1
+    },
+    "permission_set_growth": {
+      "current_count": 24,
+      "previous_count": 21,
+      "growth_rate": 14.3,
+      "absolute_change": 3
+    },
+    "assignment_growth": {
+      "current_count": 456,
+      "previous_count": 432,
+      "growth_rate": 5.6,
+      "absolute_change": 24
+    },
+    "significant_changes": [
+      {
+        "category": "permission_sets",
+        "description": "3 new permission sets added",
+        "impact": "New access patterns introduced",
+        "change_magnitude": 14.3
+      },
+      {
+        "category": "assignments",
+        "description": "24 new assignments created",
+        "impact": "Increased access distribution",
+        "change_magnitude": 5.6
+      }
+    ]
+  }
+}

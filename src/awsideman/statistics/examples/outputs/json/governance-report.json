@@ -1,0 +1,300 @@
+{
+  "metadata": {
+    "generation_timestamp": "2024-01-15T10:30:00Z",
+    "instance_arn": "arn:aws:sso:::instance/ssoins-xxxxxxxxxx",
+    "region": "eu-north-1",
+    "profile": "sso-test-1",
+    "categories_included": ["governance"],
+    "filters_applied": {},
+    "data_collection_duration": 15.3,
+    "analysis_duration": 8.7
+  },
+  "governance_view": {
+    "access_matrix": {
+      "user_to_accounts": {
+        "admin@company.com": [
+          "123456789012",
+          "234567890123",
+          "345678901234",
+          "456789012345",
+          "567890123456",
+          "678901234567",
+          "789012345678",
+          "890123456789"
+        ],
+        "devops.lead@company.com": [
+          "123456789012",
+          "234567890123",
+          "345678901234",
+          "456789012345",
+          "567890123456",
+          "678901234567"
+        ],
+        "security.admin@company.com": [
+          "123456789012",
+          "234567890123",
+          "345678901234",
+          "456789012345",
+          "567890123456"
+        ],
+        "platform.engineer@company.com": [
+          "234567890123",
+          "345678901234",
+          "456789012345",
+          "567890123456"
+        ],
+        "data.scientist@company.com": [
+          "123456789012",
+          "234567890123",
+          "345678901234"
+        ]
+      },
+      "user_to_permission_sets": {
+        "admin@company.com": [
+          "AdminAccess",
+          "ReadOnlyAccess"
+        ],
+        "devops.lead@company.com": [
+          "PowerUserAccess",
+          "NetworkAdministrator",
+          "ReadOnlyAccess"
+        ],
+        "security.admin@company.com": [
+          "SecurityAuditor",
+          "ReadOnlyAccess"
+        ],
+        "platform.engineer@company.com": [
+          "PowerUserAccess",
+          "ReadOnlyAccess"
+        ],
+        "data.scientist@company.com": [
+          "DataAnalyst",
+          "ReadOnlyAccess"
+        ]
+      },
+      "group_to_accounts": {
+        "Infrastructure-Team": [
+          "123456789012",
+          "234567890123",
+          "345678901234",
+          "456789012345",
+          "567890123456",
+          "678901234567"
+        ],
+        "Security-Team": [
+          "123456789012",
+          "234567890123",
+          "345678901234",
+          "456789012345",
+          "567890123456"
+        ],
+        "Platform-Team": [
+          "234567890123",
+          "345678901234",
+          "456789012345",
+          "567890123456"
+        ],
+        "Data-Team": [
+          "123456789012",
+          "234567890123",
+          "345678901234"
+        ],
+        "Developers": [
+          "234567890123",
+          "345678901234"
+        ]
+      },
+      "group_to_permission_sets": {
+        "Infrastructure-Team": [
+          "PowerUserAccess",
+          "NetworkAdministrator"
+        ],
+        "Security-Team": [
+          "SecurityAuditor",
+          "ReadOnlyAccess"
+        ],
+        "Platform-Team": [
+          "PowerUserAccess",
+          "ReadOnlyAccess"
+        ],
+        "Data-Team": [
+          "DataAnalyst",
+          "ReadOnlyAccess"
+        ],
+        "Developers": [
+          "DeveloperAccess"
+        ]
+      },
+      "account_to_users": {
+        "123456789012": [
+          "admin@company.com",
+          "devops.lead@company.com",
+          "security.admin@company.com",
+          "data.scientist@company.com"
+        ],
+        "234567890123": [
+          "admin@company.com",
+          "devops.lead@company.com",
+          "security.admin@company.com",
+          "platform.engineer@company.com",
+          "data.scientist@company.com"
+        ],
+        "345678901234": [
+          "admin@company.com",
+          "devops.lead@company.com",
+          "security.admin@company.com",
+          "platform.engineer@company.com",
+          "data.scientist@company.com"
+        ]
+      },
+      "account_to_groups": {
+        "123456789012": [
+          "Infrastructure-Team",
+          "Security-Team",
+          "Data-Team"
+        ],
+        "234567890123": [
+          "Infrastructure-Team",
+          "Security-Team",
+          "Platform-Team",
+          "Data-Team",
+          "Developers"
+        ],
+        "345678901234": [
+          "Infrastructure-Team",
+          "Security-Team",
+          "Platform-Team",
+          "Data-Team",
+          "Developers"
+        ]
+      }
+    },
+    "privileged_access_report": {
+      "admin_permission_sets": [
+        "AdminAccess",
+        "SecurityAuditor"
+      ],
+      "accounts_with_admin_access": {
+        "123456789012": [
+          "admin@company.com",
+          "Infrastructure-Team",
+          "Security-Team"
+        ],
+        "234567890123": [
+          "admin@company.com",
+          "Infrastructure-Team",
+          "Security-Team"
+        ],
+        "345678901234": [
+          "admin@company.com",
+          "Infrastructure-Team",
+          "Security-Team"
+        ],
+        "456789012345": [
+          "admin@company.com",
+          "Infrastructure-Team",
+          "Security-Team"
+        ],
+        "567890123456": [
+          "admin@company.com",
+          "Infrastructure-Team",
+          "Security-Team"
+        ],
+        "678901234567": [
+          "admin@company.com",
+          "Infrastructure-Team"
+        ],
+        "789012345678": [
+          "admin@company.com"
+        ],
+        "890123456789": [
+          "admin@company.com"
+        ]
+      },
+      "users_with_admin_access": [
+        "admin@company.com",
+        "security.admin@company.com"
+      ],
+      "high_privilege_patterns": [
+        {
+          "pattern_type": "cross_account_admin",
+          "description": "User has admin access across 8 accounts",
+          "affected_entities": [
+            "admin@company.com"
+          ],
+          "risk_level": "high"
+        },
+        {
+          "pattern_type": "group_admin_access",
+          "description": "Group has admin access to 6 accounts",
+          "affected_entities": [
+            "Infrastructure-Team"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "pattern_type": "security_auditor_access",
+          "description": "Security auditor has access to 5 accounts",
+          "affected_entities": [
+            "security.admin@company.com",
+            "Security-Team"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    "empty_mappings": {
+      "groups_with_no_members": [
+        "Legacy-Team"
+      ],
+      "permission_sets_with_no_assignments": [
+        "LegacyAdminAccess",
+        "TempContractorAccess",
+        "TestPermissionSet"
+      ],
+      "accounts_with_no_assignments": [
+        "998877665544"
+      ]
+    },
+    "compliance_gaps": [
+      {
+        "gap_type": "orphaned_resources",
+        "description": "Resources without proper assignments or usage",
+        "affected_resources": [
+          "3 orphaned users",
+          "1 orphaned group",
+          "3 unused permission sets",
+          "1 unassigned account"
+        ],
+        "severity": "medium"
+      },
+      {
+        "gap_type": "excessive_privileges",
+        "description": "Users or groups with admin access to multiple accounts",
+        "affected_resources": [
+          "admin@company.com (8 accounts)",
+          "Infrastructure-Team (6 accounts)"
+        ],
+        "severity": "high"
+      },
+      {
+        "gap_type": "cross_account_access",
+        "description": "Entities with access spanning multiple accounts",
+        "affected_resources": [
+          "23 users with multi-account access",
+          "8 groups with multi-account access"
+        ],
+        "severity": "medium"
+      },
+      {
+        "gap_type": "privileged_access_concentration",
+        "description": "High concentration of privileged access",
+        "affected_resources": [
+          "2 users with admin access",
+          "2 groups with admin access"
+        ],
+        "severity": "medium"
+      }
+    ]
+  }
+}

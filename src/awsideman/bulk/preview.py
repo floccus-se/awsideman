@@ -45,6 +45,21 @@ class PreviewGenerator:
         """
         self.console = console
 
+    @staticmethod
+    def _to_gerund(verb: str) -> str:
+        """Convert a verb to its gerund form using simple rules.
+
+        - If verb ends with "ie", replace with "ying" (e.g., tie -> tying)
+        - If verb ends with "e", drop the trailing e (e.g., revoke -> revoking)
+        - Otherwise append "ing"
+        """
+        lower = verb.lower()
+        if lower.endswith("ie"):
+            return f"{lower[:-2]}ying"
+        if lower.endswith("e"):
+            return f"{lower[:-1]}ing"
+        return f"{lower}ing"
+
     def generate_preview_report(
         self, assignments: List[Dict[str, Any]], operation_type: str = "assign"
     ) -> PreviewSummary:
@@ -307,15 +322,17 @@ class PreviewGenerator:
             self.console.print(warning_panel)
             self.console.print()
 
-        # Create confirmation message
+        # Create confirmation message with simple gerund formation
+        operation_gerund = self._to_gerund(operation_type)
+
         if summary.failed_resolutions > 0:
             confirm_message = (
-                f"Do you want to proceed with {operation_type}ing "
+                f"Do you want to proceed with {operation_gerund} "
                 f"{summary.successful_resolutions} assignments?"
             )
         else:
             confirm_message = (
-                f"Do you want to proceed with {operation_type}ing "
+                f"Do you want to proceed with {operation_gerund} "
                 f"{summary.total_assignments} assignments?"
             )
 

@@ -15,7 +15,7 @@ def clear_cache(
     profile: Optional[str] = typer.Option(
         None,
         "--profile",
-        help="AWS profile to clear cache for (only works with --accounts-only). Use '*' to clear all profiles.",
+        help="AWS profile to clear cache for. Use '*' to clear all profiles.",
     ),
 ) -> None:
     """Clear internal data storage.
@@ -26,15 +26,11 @@ def clear_cache(
     Use --accounts-only to clear only account-related data, which is useful
     when you know the organization structure has changed but other data is still valid.
 
-    Use --profile with --accounts-only to clear data for a specific AWS profile.
+    Use --profile to clear data for a specific AWS profile.
     """
     try:
         # Get cache manager with profile-aware configuration if profile is specified
-        if profile and not accounts_only:
-            console.print("[red]Error: --profile can only be used with --accounts-only[/red]")
-            raise typer.Exit(1)
-
-        if profile and accounts_only:
+        if profile:
             # Use profile-specific cache manager
             from ...cache.utilities import create_cache_manager, get_profile_cache_config
 
@@ -71,10 +67,7 @@ def clear_cache(
                 console.print("[blue]Cache clear cancelled.[/blue]")
                 return
 
-        # Validate profile option
-        if profile and not accounts_only:
-            console.print("[red]Error: --profile can only be used with --accounts-only[/red]")
-            raise typer.Exit(1)
+        # Profile validation is handled above
 
         # Get initial cache stats for verification
         initial_stats = cache_manager.get_cache_stats()

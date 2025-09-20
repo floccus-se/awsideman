@@ -446,6 +446,19 @@ def bulk_revoke(
     profile: Optional[str] = typer.Option(
         None, "--profile", help="AWS profile to use (uses default if not specified)"
     ),
+    rate_limit_delay: float = typer.Option(
+        0.1,
+        "--rate-limit-delay",
+        help="Delay between API calls in seconds (default: 0.1, use 0.5+ for throttling issues)",
+    ),
+    max_retries: int = typer.Option(
+        4, "--max-retries", help="Maximum retry attempts for failed operations (default: 4)"
+    ),
+    conservative_mode: bool = typer.Option(
+        False,
+        "--conservative",
+        help="Use conservative rate limiting to avoid throttling (slower but more reliable)",
+    ),
 ) -> None:
     """Bulk revoke permission sets from input file using human-readable names.
 
@@ -504,6 +517,15 @@ def bulk_revoke(
       # Process JSON format file
       $ awsideman bulk revoke assignments.json
 
+      # Use conservative mode to avoid throttling issues
+      $ awsideman bulk revoke assignments.csv --conservative
+
+      # Increase delay between API calls for throttling issues
+      $ awsideman bulk revoke assignments.csv --rate-limit-delay 0.5
+
+      # Reduce retry attempts for faster failure handling
+      $ awsideman bulk revoke assignments.csv --max-retries 2
+
     TROUBLESHOOTING:
 
       Name Resolution Errors:
@@ -516,9 +538,12 @@ def bulk_revoke(
         - Verify assignment exists in target account
         - Check principal has access to the account
 
-      Rate Limiting:
-        - Reduce batch size (--batch-size 5)
-        - Check AWS service quotas
+      Rate Limiting / Throttling Issues:
+        - Use conservative mode: --conservative
+        - Increase delay between calls: --rate-limit-delay 0.5
+        - Reduce batch size: --batch-size 5
+        - Reduce concurrent operations: --batch-size 1
+        - Check AWS service quotas and limits
 
       Permission Errors:
         - Verify Identity Store read access
@@ -558,11 +583,22 @@ def bulk_revoke(
             profile=profile_name, enable_caching=True, auto_configure_cache=True
         )
 
+        # Apply conservative mode settings if enabled
+        if conservative_mode:
+            batch_size = min(batch_size, 5)  # Limit batch size
+            rate_limit_delay = max(rate_limit_delay, 0.5)  # Increase delay
+            max_retries = min(max_retries, 6)  # Allow more retries
+            console.print(
+                "[yellow]Conservative mode enabled - using slower, more reliable settings[/yellow]"
+            )
+
         console.print(f"[blue]Starting bulk revoke operation for: {input_file}[/blue]")
         console.print(f"[dim]Profile: {profile_name}[/dim]")
         console.print(f"[dim]Dry run: {dry_run}[/dim]")
         console.print(f"[dim]Continue on error: {continue_on_error}[/dim]")
         console.print(f"[dim]Batch size: {batch_size}[/dim]")
+        console.print(f"[dim]Rate limit delay: {rate_limit_delay}s[/dim]")
+        console.print(f"[dim]Max retries: {max_retries}[/dim]")
         console.print(f"[dim]Force: {force}[/dim]")
         if account_override:
             console.print(f"[dim]Account override: {account_override}[/dim]")
@@ -697,8 +733,12 @@ def bulk_revoke(
                 len(resolved_assignments) - len(valid_assignments),
             )
 
-            # Create batch processor
+            # Create batch processor with throttling configuration
             batch_processor = BatchProcessor(aws_client, batch_size)
+
+            # Configure throttling settings
+            batch_processor.rate_limit_delay = rate_limit_delay
+            batch_processor.retry_handler.max_retries = max_retries
 
             # Process assignments
             results = asyncio.run(

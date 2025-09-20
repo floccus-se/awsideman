@@ -16,6 +16,7 @@ from .models import (
     OperationRecord,
     OperationResult,
     OperationType,
+    PermissionCloningOperationRecord,
     RollbackAction,
     RollbackActionType,
     RollbackPlan,
@@ -417,12 +418,25 @@ class RollbackProcessor:
         # Handle different operation record types
         if hasattr(operation, "results"):
             results_to_process = operation.results
-        elif hasattr(operation, "accounts_affected"):
-            # For PermissionCloningOperationRecord, create mock results from accounts
-            results_to_process = [
-                OperationResult(account_id=account_id, success=True)
-                for account_id in operation.accounts_affected
-            ]
+        elif isinstance(operation, PermissionCloningOperationRecord):
+            # A copy can contain several permission sets in the same account.
+            # Reconstruct the exact assignments, rather than one action per account.
+            for assignment in operation.parsed_assignments():
+                actions.append(
+                    RollbackAction(
+                        principal_id=assignment["principal_id"],
+                        permission_set_arn=assignment["permission_set_arn"],
+                        account_id=assignment["account_id"],
+                        action_type=rollback_type,
+                        current_state=self._get_current_assignment_state(
+                            operation,
+                            assignment["account_id"],
+                            assignment["permission_set_arn"],
+                        ),
+                        principal_type=operation.target_entity_type,
+                    )
+                )
+            results_to_process = []
         else:
             results_to_process = []
 
@@ -443,33 +457,9 @@ class RollbackProcessor:
                 # Determine current state if AWS client is available
                 current_state = self._get_current_assignment_state(operation, account_id)
 
-                # Handle different operation record types for principal and permission set info
-                if hasattr(operation, "principal_id"):
-                    principal_id = operation.principal_id
-                    permission_set_arn = operation.permission_set_arn
-                    principal_type = operation.principal_type
-                elif hasattr(operation, "source_entity_id") and hasattr(
-                    operation, "target_entity_id"
-                ):
-                    # Type narrowing for PermissionCloningOperationRecord
-                    operation_record = operation  # type: Any
-                    # For PermissionCloningOperationRecord, determine the correct principal based on operation type
-                    if operation.operation_type == OperationType.COPY_ASSIGNMENTS:
-                        # For copy operations, rollback should affect the TARGET user (who received the permissions)
-                        principal_id = operation_record.target_entity_id
-                        principal_type = operation_record.target_entity_type
-                    else:
-                        # For other operations, use source entity info
-                        principal_id = operation_record.source_entity_id
-                        principal_type = operation_record.source_entity_type
-
-                    permission_set_arn = (
-                        operation_record.permission_sets_involved[0]
-                        if operation_record.permission_sets_involved
-                        else ""
-                    )
-                else:
-                    continue
+                principal_id = operation.principal_id
+                permission_set_arn = operation.permission_set_arn
+                principal_type = operation.principal_type
 
                 action = RollbackAction(
                     principal_id=principal_id,
@@ -525,7 +515,10 @@ class RollbackProcessor:
         )
 
     def _get_current_assignment_state(
-        self, operation: OperationRecord, account_id: str
+        self,
+        operation: OperationRecord,
+        account_id: str,
+        permission_set_arn: Optional[str] = None,
     ) -> AssignmentState:
         """Get the current state of an assignment.
 
@@ -551,7 +544,9 @@ class RollbackProcessor:
             ):
                 # Type narrowing for PermissionCloningOperationRecord
                 operation_record = operation  # type: Any
-                permission_set_arn = operation_record.permission_sets_involved[0]
+                permission_set_arn = (
+                    permission_set_arn or operation_record.permission_sets_involved[0]
+                )
                 if operation.operation_type == OperationType.COPY_ASSIGNMENTS:
                     # For copy operations, check the target user's assignments
                     principal_id = operation_record.target_entity_id
@@ -567,21 +562,10 @@ class RollbackProcessor:
             if not sso_instance_arn:
                 return AssignmentState.UNKNOWN
 
-            # Check if assignment exists
-            current_assignments = self.identity_center_client.list_account_assignments(
-                InstanceArn=sso_instance_arn,
-                AccountId=account_id,
-                PermissionSetArn=permission_set_arn,
-            )
-
-            # Look for matching assignment
-            for assignment in current_assignments.get("AccountAssignments", []):
-                if (
-                    assignment["PrincipalId"] == principal_id
-                    and assignment["PrincipalType"] == principal_type
-                ):
-                    return AssignmentState.ASSIGNED
-
+            if self._assignment_exists(
+                sso_instance_arn, account_id, permission_set_arn, principal_id, principal_type
+            ):
+                return AssignmentState.ASSIGNED
             return AssignmentState.NOT_ASSIGNED
 
         except ClientError as e:
@@ -594,6 +578,33 @@ class RollbackProcessor:
                 f"[yellow]Warning: Unexpected error checking assignment state for account {account_id}: {e}[/yellow]"
             )
             return AssignmentState.UNKNOWN
+
+    def _assignment_exists(
+        self,
+        instance_arn: str,
+        account_id: str,
+        permission_set_arn: str,
+        principal_id: str,
+        principal_type: str,
+    ) -> bool:
+        """Search every assignment page before treating an assignment as absent."""
+        params = {
+            "InstanceArn": instance_arn,
+            "AccountId": account_id,
+            "PermissionSetArn": permission_set_arn,
+        }
+        while True:
+            response = self.identity_center_client.list_account_assignments(**params)
+            if any(
+                assignment.get("PrincipalId") == principal_id
+                and assignment.get("PrincipalType") == principal_type
+                for assignment in response.get("AccountAssignments", [])
+            ):
+                return True
+            next_token = response.get("NextToken")
+            if not next_token:
+                return False
+            params["NextToken"] = next_token
 
     def execute_rollback(
         self,
@@ -680,6 +691,7 @@ class RollbackProcessor:
         # Check if there are actions to process
         if not plan.actions:
             # If no actions, return early
+            self.performance_tracker.finish_operation_tracking(rollback_operation_id)
             return RollbackResult(
                 success=True,
                 rollback_operation_id=rollback_operation_id,
@@ -688,6 +700,9 @@ class RollbackProcessor:
                 errors=[],
                 duration_ms=0,
             )
+
+        # Nonempty plans have already passed instance ARN validation above.
+        assert sso_instance_arn is not None
 
         # Process actions in batches (progress tracking disabled)
         console.print(f"[blue]Rolling back {len(plan.actions)} assignments...[/blue]")
@@ -701,31 +716,19 @@ class RollbackProcessor:
                 for action in batch:
                     action_start_time = datetime.now(timezone.utc)
 
-                    def execute_action():
+                    def execute_action(action: RollbackAction = action) -> Any:
                         import concurrent.futures
 
                         def aws_api_call():
                             try:
+                                assignment_exists = self._assignment_exists(
+                                    sso_instance_arn,
+                                    action.account_id,
+                                    action.permission_set_arn,
+                                    action.principal_id,
+                                    action.principal_type.value,
+                                )
                                 if action.action_type == RollbackActionType.ASSIGN:
-                                    # For assign operations, check if assignment already exists
-                                    existing_assignments = (
-                                        self.identity_center_client.list_account_assignments(
-                                            InstanceArn=sso_instance_arn,
-                                            AccountId=action.account_id,
-                                            PermissionSetArn=action.permission_set_arn,
-                                        )
-                                    )
-
-                                    # Check if assignment already exists
-                                    assignment_exists = any(
-                                        assignment.get("PrincipalId") == action.principal_id
-                                        and assignment.get("PrincipalType")
-                                        == action.principal_type.value
-                                        for assignment in existing_assignments.get(
-                                            "AccountAssignments", []
-                                        )
-                                    )
-
                                     if assignment_exists:
                                         console.print(
                                             f"[yellow]Assignment already exists for account {action.account_id}, skipping creation[/yellow]"
@@ -754,24 +757,6 @@ class RollbackProcessor:
                                     )
                                     return response
                                 else:
-                                    # For delete operations, check if assignment exists before attempting deletion
-                                    existing_assignments = (
-                                        self.identity_center_client.list_account_assignments(
-                                            InstanceArn=sso_instance_arn,
-                                            AccountId=action.account_id,
-                                            PermissionSetArn=action.permission_set_arn,
-                                        )
-                                    )
-
-                                    # Check if assignment exists
-                                    assignment_exists = any(
-                                        assignment.get("PrincipalId") == action.principal_id
-                                        and assignment.get("PrincipalType")
-                                        == action.principal_type.value
-                                        for assignment in existing_assignments.get(
-                                            "AccountAssignments", []
-                                        )
-                                    )
                                     if not assignment_exists:
                                         console.print(
                                             f"[yellow]Assignment already deleted for account {action.account_id}, skipping deletion[/yellow]"

@@ -428,6 +428,9 @@ class BatchProcessor:
         self.batch_size = batch_size
         self.retry_handler = RetryHandler()
 
+        # Rate limiting configuration
+        self.rate_limit_delay = 0.1  # Default delay between API calls
+
         # Initialize AWS clients
         self.sso_admin_client = aws_client_manager.get_identity_center_client()
         self.identity_store_client = aws_client_manager.get_identity_store_client()
@@ -914,6 +917,12 @@ class BatchProcessor:
 
         for attempt in range(self.retry_handler.max_retries + 1):
             try:
+                # Apply rate limiting delay before API calls
+                if self.rate_limit_delay > 0:
+                    import time
+
+                    time.sleep(self.rate_limit_delay)
+
                 # Check if assignment already exists
                 list_params = {
                     "InstanceArn": instance_arn,
@@ -1063,6 +1072,12 @@ class BatchProcessor:
 
         for attempt in range(self.retry_handler.max_retries + 1):
             try:
+                # Apply rate limiting delay before API calls
+                if self.rate_limit_delay > 0:
+                    import time
+
+                    time.sleep(self.rate_limit_delay)
+
                 # Check if assignment exists
                 list_params = {
                     "InstanceArn": instance_arn,

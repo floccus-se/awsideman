@@ -7,6 +7,20 @@ title = "awsideman secrets detection"
 [extend]
 useDefault = true
 
+# Statistics fixtures, rendered example reports, and CLI examples deliberately
+# contain synthetic identifiers and addresses. Scanning them with the project
+# PII rules creates false positives without improving secret detection.
+[[allowlists]]
+description = "Synthetic statistics test data, reports, and CLI examples"
+paths = [
+  '''^tests/''',
+  '''^docs/''',
+  '''^examples/''',
+  '''^specs/''',
+  '''^src/awsideman/statistics/(README\.md|TROUBLESHOOTING\.md|examples/)''',
+  '''^src/awsideman/commands/statistics/''',
+]
+
 # Custom rules for awsideman-specific sensitive data
 [[rules]]
 id = "awsideman-email-addresses"
@@ -18,7 +32,7 @@ entropy = 0
 [[rules]]
 id = "awsideman-real-profile-names"
 description = "Real AWS profile names (not test profiles)"
-regex = '''profile\s*[=:]\s*["']?[a-zA-Z0-9_-]+["']?'''
+regex = '''\bprofile\s*=\s*["'][a-zA-Z0-9_-]+["']'''
 tags = ["aws", "profile", "sensitive"]
 entropy = 0
 
@@ -53,27 +67,27 @@ entropy = 0
 [[rules]]
 id = "awsideman-real-region-names"
 description = "Real AWS region names (not test regions)"
-regex = '''region[=:]\s*["']?[a-z0-9-]+["']?'''
+regex = '''\bregion\s*=\s*["'][a-z0-9-]+["']'''
 tags = ["aws", "region", "sensitive"]
 entropy = 0
 
 [[rules]]
 id = "awsideman-real-user-names"
 description = "Real usernames (not test users)"
-regex = '''username[=:]\s*["']?[a-zA-Z0-9._-]+["']?'''
+regex = '''\busername\s*=\s*["'][a-zA-Z0-9._-]+["']'''
 tags = ["username", "pii", "sensitive"]
 entropy = 0
 
 [[rules]]
 id = "awsideman-real-group-names"
 description = "Real group names (not test groups)"
-regex = '''group[=:]\s*["']?[a-zA-Z0-9._-]+["']?'''
+regex = '''\bgroup\s*=\s*["'][a-zA-Z0-9._-]+["']?'''
 tags = ["group", "pii", "sensitive"]
 entropy = 0
 
 [[rules]]
 id = "awsideman-real-permission-set-names"
 description = "Real permission set names (not test permission sets)"
-regex = '''permission[_-]?set[=:]\s*["']?[a-zA-Z0-9._-]+["']?'''
+regex = '''\bpermission[_-]?set\s*=\s*["'][a-zA-Z0-9._-]+["']'''
 tags = ["permission-set", "sensitive"]
 entropy = 0

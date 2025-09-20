@@ -109,7 +109,7 @@ class PermissionCloningRollbackIntegration:
             )
 
             # Store the operation record
-            self.rollback_processor.store.store_operation(operation_record)  # type: ignore[arg-type]
+            self.rollback_processor.store.store_operation(operation_record)
 
             logger.info(
                 f"Tracked assignment copy operation {operation_record.operation_id} for rollback"
@@ -172,7 +172,7 @@ class PermissionCloningRollbackIntegration:
             )
 
             # Store the operation record
-            self.rollback_processor.store.store_operation(operation_record)  # type: ignore[arg-type]
+            self.rollback_processor.store.store_operation(operation_record)
 
             logger.info(
                 f"Tracked permission set clone operation {operation_record.operation_id} for rollback"
@@ -201,6 +201,9 @@ class PermissionCloningRollbackIntegration:
             if not operation_record:
                 raise ValueError(f"Operation {operation_id} not found")
 
+            if not isinstance(operation_record, PermissionCloningOperationRecord):
+                raise ValueError(f"Operation {operation_id} is not an assignment copy operation")
+
             if operation_record.rolled_back:
                 raise ValueError(f"Operation {operation_id} has already been rolled back")
 
@@ -208,25 +211,17 @@ class PermissionCloningRollbackIntegration:
 
             # Create rollback actions
             rollback_actions = []
-            for assignment_id in getattr(operation_record, "assignments_copied", []):
-                # Parse assignment ID to extract components
-                parts = assignment_id.split(":")
-                if len(parts) >= 3:
-                    permission_set_arn = parts[0]
-                    account_id = parts[1]
-                    entity_id = parts[2]
-
-                    rollback_action = RollbackAction(
-                        principal_id=entity_id,
-                        permission_set_arn=permission_set_arn,
-                        account_id=account_id,
+            for assignment in operation_record.parsed_assignments():
+                rollback_actions.append(
+                    RollbackAction(
+                        principal_id=assignment["principal_id"],
+                        permission_set_arn=assignment["permission_set_arn"],
+                        account_id=assignment["account_id"],
                         action_type=RollbackActionType.REVOKE_COPIED_ASSIGNMENTS,
                         current_state=AssignmentState.ASSIGNED,
-                        principal_type=getattr(
-                            operation_record, "target_entity_type", PrincipalType.USER
-                        ),
+                        principal_type=operation_record.target_entity_type,
                     )
-                    rollback_actions.append(rollback_action)
+                )
 
             # Execute rollback actions
             success_count = 0
@@ -249,10 +244,11 @@ class PermissionCloningRollbackIntegration:
                     errors.append(error_msg)
                     logger.error(error_msg)
 
-            # Mark operation as rolled back
-            operation_record.rolled_back = True
-            operation_record.rollback_operation_id = f"rollback_{operation_id}"
-            self.rollback_processor.store.store_operation(operation_record)
+            # Failed actions must remain available for a later retry.
+            if failure_count == 0:
+                operation_record.rolled_back = True
+                operation_record.rollback_operation_id = f"rollback_{operation_id}"
+                self.rollback_processor.store.store_operation(operation_record)
 
             result = {
                 "operation_id": operation_id,
@@ -434,7 +430,8 @@ class PermissionCloningRollbackIntegration:
             if entity_type == PrincipalType.USER:
                 sso_admin_client.delete_account_assignment(
                     InstanceArn=self._get_instance_arn(),
-                    AccountId=account_id,
+                    TargetId=account_id,
+                    TargetType="AWS_ACCOUNT",
                     PermissionSetArn=permission_set_arn,
                     PrincipalId=entity_id,
                     PrincipalType="USER",
@@ -442,7 +439,8 @@ class PermissionCloningRollbackIntegration:
             elif entity_type == PrincipalType.GROUP:
                 sso_admin_client.delete_account_assignment(
                     InstanceArn=self._get_instance_arn(),
-                    AccountId=account_id,
+                    TargetId=account_id,
+                    TargetType="AWS_ACCOUNT",
                     PermissionSetArn=permission_set_arn,
                     PrincipalId=entity_id,
                     PrincipalType="GROUP",
