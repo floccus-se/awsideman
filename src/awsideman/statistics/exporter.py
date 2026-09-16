@@ -1124,6 +1124,11 @@ class StatisticsExporter:
         report.user_group_metrics.groups_per_user = {
             k: v for k, v in report.user_group_metrics.groups_per_user.items() if k in user_ids
         }
+        report.user_group_metrics.groups_per_user_by_name = {
+            k: v
+            for k, v in report.user_group_metrics.groups_per_user_by_name.items()
+            if k in user_ids
+        }
         report.user_group_metrics.orphaned_users = [
             user for user in report.user_group_metrics.orphaned_users if user in user_ids
         ]

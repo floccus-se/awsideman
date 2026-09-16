@@ -1,5 +1,6 @@
 """Statistics analyzer for performing calculations and pattern analysis."""
 
+import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -30,6 +31,32 @@ if TYPE_CHECKING:
 
 class StatisticsAnalyzer:
     """Analyzes collected data to generate insights."""
+
+    @staticmethod
+    def _has_wildcard_action(inline_policy: str) -> bool:
+        """Return whether an inline policy grants every AWS action.
+
+        A wildcard resource is common in narrowly-scoped policies, so it is
+        not enough on its own to classify a permission set as administrative.
+        """
+        try:
+            statements = json.loads(inline_policy).get("Statement", [])
+        except (AttributeError, json.JSONDecodeError):
+            return False
+
+        if isinstance(statements, dict):
+            statements = [statements]
+
+        for statement in statements:
+            if not isinstance(statement, dict) or statement.get("Effect") != "Allow":
+                continue
+            actions = statement.get("Action", [])
+            if isinstance(actions, str):
+                actions = [actions]
+            if "*" in actions:
+                return True
+
+        return False
 
     def calculate_user_group_metrics(
         self,
@@ -194,7 +221,6 @@ class StatisticsAnalyzer:
             "PowerUserAccess",
             "IAMFullAccess",
             "SecurityAudit",
-            "ReadOnlyAccess",
         ]
 
         for ps in permission_sets:
@@ -209,9 +235,7 @@ class StatisticsAnalyzer:
 
             # Check inline policy for admin-like permissions
             if not is_privileged and ps.inline_policy:
-                inline_lower = ps.inline_policy.lower()
-                if any(keyword in inline_lower for keyword in ["*", "admin", "full", "all"]):
-                    is_privileged = True
+                is_privileged = self._has_wildcard_action(ps.inline_policy)
 
             if is_privileged:
                 privileged_permission_sets.append(ps.name)
@@ -468,18 +492,21 @@ class StatisticsAnalyzer:
             unassigned_accounts=unassigned_accounts,
         )
 
-    def detect_privileged_access(
-        self, permission_sets: List["PermissionSetData"]
-    ) -> "PrivilegedAccessReport":
+    def detect_privileged_access(self, permission_sets: Any) -> "PrivilegedAccessReport":
         """Detect privileged access patterns.
 
         Args:
-            permission_sets: Permission set data
+            permission_sets: Permission set data, or complete raw statistics data
 
         Returns:
             Privileged access report
         """
         from .models import PrivilegedAccessReport, PrivilegePattern
+
+        if hasattr(permission_sets, "permission_sets") and hasattr(
+            permission_sets.permission_sets, "permission_sets"
+        ):
+            return self.calculate_governance_view(permission_sets).privileged_access_report
 
         # Define patterns for admin/privileged policies
         admin_policy_patterns = [
@@ -515,7 +542,7 @@ class StatisticsAnalyzer:
                     privilege_patterns.append(f"High privilege managed policy: {policy_name}")
 
             # Check customer managed policies
-            for policy_ref in ps.customer_managed_policies:
+            for policy_ref in ps.customer_managed_policies or []:
                 policy_name = policy_ref.get("Name", "")
                 if any(
                     pattern.lower() in policy_name.lower()
@@ -524,17 +551,9 @@ class StatisticsAnalyzer:
                     privilege_patterns.append(f"High privilege customer policy: {policy_name}")
 
             # Check inline policy for admin-like permissions
-            if ps.inline_policy:
-                inline_lower = ps.inline_policy.lower()
-                suspicious_patterns = ["*", '"*"', 'effect": "allow"', 'resource": "*"']
-
-                if any(pattern in inline_lower for pattern in suspicious_patterns):
-                    # Look for broad permissions
-                    if '"action": "*"' in inline_lower or '"action":["*"]' in inline_lower:
-                        is_admin = True
-                        privilege_patterns.append("Inline policy with wildcard actions")
-                    elif "admin" in inline_lower or "full" in inline_lower:
-                        privilege_patterns.append("Inline policy with admin-like permissions")
+            if ps.inline_policy and self._has_wildcard_action(ps.inline_policy):
+                is_admin = True
+                privilege_patterns.append("Inline policy with wildcard actions")
 
             if is_admin:
                 admin_permission_sets.append(ps.name)
@@ -733,7 +752,12 @@ class StatisticsAnalyzer:
         def check_significant_change(metric: GrowthMetric, category: str) -> None:
             if abs(metric.growth_rate) > 20 or abs(metric.absolute_change) > 10:
                 direction = "increased" if metric.absolute_change > 0 else "decreased"
-                impact = "HIGH" if abs(metric.growth_rate) > 50 else "MEDIUM"
+                if category == "assignments" and metric.growth_rate > 50:
+                    impact = "security_risk"
+                elif metric.absolute_change > 0:
+                    impact = "positive"
+                else:
+                    impact = "negative"
 
                 change = SignificantChange(
                     category=category,
@@ -881,7 +905,7 @@ class StatisticsAnalyzer:
             metrics=metrics, insights=insights, recommendations=recommendations
         )
 
-    def analyze_governance_gaps(self, data: Dict[str, Any]) -> "GovernanceAnalysis":
+    def analyze_governance_gaps(self, data: Any) -> "GovernanceAnalysis":
         """Analyze governance gaps and compliance issues.
 
         Args:
@@ -899,8 +923,9 @@ class StatisticsAnalyzer:
             PrivilegedAccessReport,
         )
 
-        # Extract raw data if provided
-        raw_data = data.get("raw_data")
+        # Accept the raw collection result directly as well as the legacy
+        # {"raw_data": ...} wrapper used by the analyzer interface.
+        raw_data = data if hasattr(data, "assignments") else data.get("raw_data")
         if not raw_data:
             # Create minimal governance view if no data provided
             empty_matrix = AccessMatrix(
@@ -1146,7 +1171,7 @@ class StatisticsAnalyzer:
         Returns:
             Governance view analysis
         """
-        from .models import GovernanceView
+        from .models import GovernanceView, PrivilegePattern
 
         # Generate access matrix
         access_matrix = self.generate_access_matrix(data)
@@ -1168,6 +1193,7 @@ class StatisticsAnalyzer:
         # Find accounts with admin access
         accounts_with_admin_access: Dict[str, List[str]] = {}
         users_with_admin_access = set()
+        user_admin_accounts: Dict[str, set[str]] = {}
 
         for assignment in data.assignments.assignments:
             if assignment.permission_set_arn in admin_ps_arns:
@@ -1184,6 +1210,7 @@ class StatisticsAnalyzer:
                             break
                     accounts_with_admin_access[account_id].append(f"User: {user_name}")
                     users_with_admin_access.add(user_name)
+                    user_admin_accounts.setdefault(user_name, set()).add(account_id)
 
                 elif assignment.principal_type == "GROUP":
                     # Find group name
@@ -1200,7 +1227,22 @@ class StatisticsAnalyzer:
                         for user in data.users.users:
                             if user.user_id == user_id:
                                 users_with_admin_access.add(user.username)
+                                user_admin_accounts.setdefault(user.username, set()).add(account_id)
                                 break
+
+        for user_name, account_ids in user_admin_accounts.items():
+            if len(account_ids) > 1:
+                privileged_access.high_privilege_patterns.append(
+                    PrivilegePattern(
+                        pattern_type="cross_account_admin",
+                        description=(
+                            f"User '{user_name}' has administrative access to "
+                            f"{len(account_ids)} accounts"
+                        ),
+                        affected_entities=[user_name, *sorted(account_ids)],
+                        risk_level="HIGH",
+                    )
+                )
 
         # Update privileged access report
         privileged_access.accounts_with_admin_access = accounts_with_admin_access

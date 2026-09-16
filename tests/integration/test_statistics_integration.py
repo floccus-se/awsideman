@@ -227,6 +227,7 @@ class TestStatisticsIntegration:
         client_manager.is_caching_enabled.return_value = (
             False  # Disable cache for integration tests
         )
+        client_manager.region = "us-east-1"
 
         # Mock Identity Store client
         identity_store_client = Mock()
@@ -243,6 +244,14 @@ class TestStatisticsIntegration:
         identity_store_client.list_group_memberships_for_member.side_effect = (
             mock_group_memberships_for_member
         )
+
+        def mock_group_memberships(**kwargs: Any) -> Dict[str, Any]:
+            group_id = kwargs.get("GroupId", "")
+            return mock_aws_responses["list_group_memberships"].get(
+                group_id, {"GroupMemberships": [], "NextToken": None}
+            )
+
+        identity_store_client.list_group_memberships.side_effect = mock_group_memberships
 
         # Mock Identity Center client
         identity_center_client = Mock()
@@ -278,6 +287,26 @@ class TestStatisticsIntegration:
         identity_center_client.list_managed_policies_in_permission_set.side_effect = (
             mock_list_managed_policies
         )
+        identity_center_client.list_customer_managed_policy_references_in_permission_set.return_value = {
+            "CustomerManagedPolicyReferences": []
+        }
+        identity_center_client.get_inline_policy_for_permission_set.return_value = {
+            "InlinePolicy": ""
+        }
+
+        def mock_accounts_for_permission_set(**kwargs: Any) -> Dict[str, Any]:
+            permission_set_arn = kwargs.get("PermissionSetArn", "")
+            if "ps-admin" in permission_set_arn:
+                account_ids = ["123456789012"]
+            elif "ps-dev" in permission_set_arn:
+                account_ids = ["123456789012", "123456789013"]
+            else:
+                account_ids = []
+            return {"AccountIds": account_ids, "NextToken": None}
+
+        identity_center_client.list_accounts_for_provisioned_permission_set.side_effect = (
+            mock_accounts_for_permission_set
+        )
 
         # Mock account assignments
         def mock_list_account_assignments(**kwargs: Any) -> Dict[str, Any]:
@@ -291,6 +320,7 @@ class TestStatisticsIntegration:
         # Mock Organizations client
         organizations_client = Mock()
         organizations_client.list_accounts.return_value = mock_aws_responses["list_accounts"]
+        organizations_client.list_tags_for_resource.return_value = {"Tags": []}
 
         # Wire up clients
         client_manager.get_identity_store_client.return_value = identity_store_client
@@ -358,7 +388,7 @@ class TestStatisticsIntegration:
         privileged_ps = result.permission_set_metrics.privileged_permission_sets
         assert "AdminAccess" in privileged_ps
         assert "DeveloperAccess" in privileged_ps  # PowerUserAccess is privileged
-        assert "ReadOnlyAccess" in privileged_ps
+        assert "ReadOnlyAccess" not in privileged_ps
 
         # Verify governance view includes privileged access report
         assert result.governance_view.privileged_access_report is not None
@@ -458,27 +488,23 @@ class TestStatisticsIntegration:
         assert account_metrics.total_accounts == 2
 
     @pytest.mark.asyncio
-    async def test_error_resilience(self, mock_client_manager: Mock) -> None:
+    async def test_error_resilience(
+        self, mock_client_manager: Mock, mock_aws_responses: Dict[str, Any]
+    ) -> None:
         """Test system resilience to partial API failures."""
         instance_arn = "arn:aws:sso:::instance/ssoins-1234567890abcdef"
         manager = StatisticsManager(mock_client_manager, instance_arn)
 
         # Simulate partial failure in one API call
         identity_store_client = mock_client_manager.get_identity_store_client.return_value
-        original_list_groups = identity_store_client.list_groups
+        identity_store_client.list_groups.side_effect = [
+            Exception("Temporary API failure"),
+            mock_aws_responses["list_groups"],
+        ]
 
-        def failing_list_groups(*args: Any, **kwargs: Any) -> Dict[str, Any]:
-            # Fail on first call, succeed on retry
-            if not hasattr(failing_list_groups, "called"):
-                failing_list_groups.called = True  # type: ignore[attr-defined]
-                raise Exception("Temporary API failure")
-            return original_list_groups(*args, **kwargs)
-
-        identity_store_client.list_groups.side_effect = failing_list_groups
-
-        # Should handle the failure gracefully
-        with pytest.raises(Exception):
-            await manager.generate_statistics()
+        # The collector retries transient errors and returns a complete report.
+        result = await manager.generate_statistics()
+        assert isinstance(result, StatisticsReport)
 
     @pytest.mark.asyncio
     async def test_large_dataset_handling(self, mock_client_manager: Mock) -> None:

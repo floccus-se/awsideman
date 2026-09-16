@@ -1386,6 +1386,8 @@ class StatisticsCollector:
     async def _collect_assignments_for_account(
         self, identity_center_client: Any, account_id: str
     ) -> List["AssignmentData"]:
+        from .models import AssignmentData
+
         assignments = []
         try:
             # First, list all permission sets (use cached version)

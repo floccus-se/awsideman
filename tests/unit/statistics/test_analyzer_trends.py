@@ -17,6 +17,7 @@ from src.awsideman.statistics.models import (
     PermissionSetStatistics,
     RawStatisticsData,
     TrendAnalysis,
+    TrendData,
     UserData,
     UserStatistics,
 )
@@ -464,19 +465,15 @@ class TestStatisticsAnalyzerTrends:
         """Test assignment patterns calculation with trend data."""
         # First calculate basic assignment patterns
         current_assignments = current_data.assignments.assignments
-        # Then add trend analysis
-        trend_analysis = analyzer.compare_historical_data(current_data, historical_data)
-
         # Create assignment patterns with trend
         result_with_trend = analyzer.calculate_assignment_patterns_with_trend(
-            current_assignments, trend_analysis
+            current_assignments, historical_data
         )
 
         assert result_with_trend.assignment_growth_trend is not None
-        assert isinstance(result_with_trend.assignment_growth_trend, GrowthMetric)
-        assert result_with_trend.assignment_growth_trend.current_count == 15
-        assert result_with_trend.assignment_growth_trend.previous_count == 10
-        assert result_with_trend.assignment_growth_trend.growth_rate == 50.0
+        assert isinstance(result_with_trend.assignment_growth_trend, TrendData)
+        assert result_with_trend.assignment_growth_trend.values == [10, 15]
+        assert result_with_trend.assignment_growth_trend.trend_direction == "increasing"
 
     def test_trend_analysis_validation(self, analyzer, current_data, historical_data):
         """Test trend analysis data validation."""

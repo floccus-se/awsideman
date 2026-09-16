@@ -124,6 +124,7 @@ class TestStatisticsPerformance:
         """Create a mock client manager with the given responses."""
         client_manager = Mock()
         client_manager.is_caching_enabled.return_value = False
+        client_manager.region = "us-east-1"
 
         # Identity Store client
         identity_store_client = Mock()

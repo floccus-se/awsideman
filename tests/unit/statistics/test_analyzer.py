@@ -291,7 +291,7 @@ class TestStatisticsAnalyzer:
         # Check privileged permission sets detection
         assert "DeveloperAccess" in result.privileged_permission_sets  # PowerUserAccess
         assert "AdminAccess" in result.privileged_permission_sets  # AdministratorAccess
-        assert "ReadOnlyAccess" in result.privileged_permission_sets  # ReadOnlyAccess
+        assert "ReadOnlyAccess" not in result.privileged_permission_sets
         assert "UnusedAccess" not in result.privileged_permission_sets
 
     def test_calculate_account_metrics(self, analyzer, sample_accounts, sample_assignments):
@@ -527,7 +527,7 @@ class TestStatisticsAnalyzer:
             "group1": [f"user{i}" for i in range(1, 6)],  # 5 members
             "group2": [f"user{i}" for i in range(6, 16)],  # 10 members
             "group3": [f"user{i}" for i in range(16, 21)]
-            + [f"user{i}" for i in range(1, 4)],  # 7 members
+            + [f"user{i}" for i in range(1, 3)],  # 7 members
         }
 
         # Build reverse mapping for group_memberships

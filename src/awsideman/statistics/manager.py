@@ -118,6 +118,8 @@ class StatisticsManager(StatisticsManagerInterface):
         if filters is None:
             filters = {}
 
+        logger.info("Generating statistics report")
+
         # Collect data
         raw_data = await self._collect_data_parallel()
 
@@ -229,6 +231,14 @@ class StatisticsManager(StatisticsManagerInterface):
         generation_time = datetime.now()
         duration = (generation_time - start_time).total_seconds()
 
+        historical_comparison = None
+        if include_historical and backup_path:
+            historical_data = self.collector.get_historical_data(backup_path)
+            if historical_data is not None:
+                historical_comparison = self.analyzer.compare_historical_data(
+                    filtered_data, historical_data
+                )
+
         report = StatisticsReport(
             metadata=ReportMetadata(
                 generation_timestamp=start_time,
@@ -245,9 +255,10 @@ class StatisticsManager(StatisticsManagerInterface):
             account_metrics=account_metrics,
             assignment_patterns=assignment_patterns,
             governance_view=governance_view,
-            historical_comparison=None,  # TODO: Implement historical comparison
+            historical_comparison=historical_comparison,
         )
 
+        logger.info("Statistics report generated")
         return report
 
     def _apply_filters(
@@ -421,8 +432,8 @@ class StatisticsManager(StatisticsManagerInterface):
         Returns:
             User and group metrics
         """
-        # This will be implemented in task 6.1
-        raise NotImplementedError("Will be implemented in task 6.1")
+        data = await self._collect_data_parallel()
+        return self.analyzer.calculate_user_group_metrics(data.users, data.groups, data.assignments)
 
     async def generate_permission_set_statistics(self) -> "PermissionSetMetrics":
         """Generate permission set statistics.
@@ -430,8 +441,10 @@ class StatisticsManager(StatisticsManagerInterface):
         Returns:
             Permission set metrics
         """
-        # This will be implemented in task 6.1
-        raise NotImplementedError("Will be implemented in task 6.1")
+        data = await self._collect_data_parallel()
+        return self.analyzer.calculate_permission_set_metrics(
+            data.permission_sets.permission_sets, data.assignments.assignments
+        )
 
     async def generate_account_statistics(self) -> "AccountMetrics":
         """Generate account statistics.
@@ -439,8 +452,10 @@ class StatisticsManager(StatisticsManagerInterface):
         Returns:
             Account metrics
         """
-        # This will be implemented in task 6.1
-        raise NotImplementedError("Will be implemented in task 6.1")
+        data = await self._collect_data_parallel()
+        return self.analyzer.calculate_account_metrics(
+            data.accounts.accounts, data.assignments.assignments, data.users.users
+        )
 
     async def generate_assignment_patterns(self) -> "AssignmentPatterns":
         """Generate assignment pattern analysis.
@@ -448,8 +463,8 @@ class StatisticsManager(StatisticsManagerInterface):
         Returns:
             Assignment patterns analysis
         """
-        # This will be implemented in task 6.1
-        raise NotImplementedError("Will be implemented in task 6.1")
+        data = await self._collect_data_parallel()
+        return self.analyzer.calculate_assignment_patterns(data.assignments.assignments)
 
     async def generate_governance_view(self) -> "GovernanceView":
         """Generate governance-oriented view.
@@ -457,5 +472,5 @@ class StatisticsManager(StatisticsManagerInterface):
         Returns:
             Governance view analysis
         """
-        # This will be implemented in task 6.1
-        raise NotImplementedError("Will be implemented in task 6.1")
+        data = await self._collect_data_parallel()
+        return self.analyzer.calculate_governance_view(data)

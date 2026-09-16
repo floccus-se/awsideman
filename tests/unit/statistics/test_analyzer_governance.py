@@ -214,8 +214,14 @@ class TestStatisticsAnalyzerGovernance:
 
         # Check user to permission sets mapping
         assert "user1" in result.user_to_permission_sets
-        assert "AdminAccess" in result.user_to_permission_sets["user1"]
-        assert "DeveloperAccess" in result.user_to_permission_sets["user1"]
+        assert (
+            "arn:aws:sso:::permissionSet/ssoins-123/ps-admin"
+            in result.user_to_permission_sets["user1"]
+        )
+        assert (
+            "arn:aws:sso:::permissionSet/ssoins-123/ps-dev"
+            in result.user_to_permission_sets["user1"]
+        )
 
         # Check group to accounts mapping
         assert "group1" in result.group_to_accounts
@@ -223,7 +229,10 @@ class TestStatisticsAnalyzerGovernance:
 
         # Check group to permission sets mapping
         assert "group1" in result.group_to_permission_sets
-        assert "DeveloperAccess" in result.group_to_permission_sets["group1"]
+        assert (
+            "arn:aws:sso:::permissionSet/ssoins-123/ps-dev"
+            in result.group_to_permission_sets["group1"]
+        )
 
         # Check account to users mapping
         assert "123456789012" in result.account_to_users
@@ -246,11 +255,11 @@ class TestStatisticsAnalyzerGovernance:
 
         # Check accounts with admin access
         assert "123456789012" in result.accounts_with_admin_access
-        assert "user1" in result.accounts_with_admin_access["123456789012"]
-        assert "group1" in result.accounts_with_admin_access["123456789012"]
+        assert "User: john.doe" in result.accounts_with_admin_access["123456789012"]
+        assert "Group: Active Group" in result.accounts_with_admin_access["123456789012"]
 
         # Check users with admin access
-        assert "user1" in result.users_with_admin_access
+        assert "john.doe" in result.users_with_admin_access
 
         # Check high privilege patterns
         assert len(result.high_privilege_patterns) > 0
@@ -262,12 +271,12 @@ class TestStatisticsAnalyzerGovernance:
         assert isinstance(result, GovernanceAnalysis)
 
         # Should identify various governance issues
-        assert len(result.compliance_gaps) > 0
+        assert len(result.view.compliance_gaps) > 0
 
         # Check for specific gap types
-        gap_types = [gap.gap_type for gap in result.compliance_gaps]
-        assert "orphaned_resources" in gap_types
-        assert "privileged_access" in gap_types
+        gap_types = [gap.gap_type for gap in result.view.compliance_gaps]
+        assert "user_organization" in gap_types
+        assert "excessive_privilege" in gap_types
 
     def test_orphaned_resources_edge_cases(self, analyzer):
         """Test orphaned resource detection with edge cases."""
@@ -390,23 +399,21 @@ class TestStatisticsAnalyzerGovernance:
             ),
             # Custom with wildcard inline policy
             PermissionSetData(
-                "ps-custom",
-                "CustomPS",
-                "Custom PS",
-                "PT8H",
-                [],
-                '{"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Action": "*", "Resource": "*"}]}',
-                None,
+                permission_set_arn="ps-custom",
+                name="CustomPS",
+                description="Custom PS",
+                session_duration="PT8H",
+                managed_policies=[],
+                inline_policy='{"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Action": "*", "Resource": "*"}]}',
             ),
             # Non-privileged
             PermissionSetData(
-                "ps-limited",
-                "LimitedPS",
-                "Limited PS",
-                "PT8H",
-                [],
-                '{"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Action": "s3:GetObject", "Resource": "*"}]}',
-                None,
+                permission_set_arn="ps-limited",
+                name="LimitedPS",
+                description="Limited PS",
+                session_duration="PT8H",
+                managed_policies=[],
+                inline_policy='{"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Action": "s3:GetObject", "Resource": "*"}]}',
             ),
         ]
 
@@ -434,7 +441,7 @@ class TestStatisticsAnalyzerGovernance:
         result = analyzer.detect_privileged_access(raw_data)
 
         # Check that all privileged permission sets are detected
-        expected_privileged = {"AdminPS", "PowerPS", "IAMPS", "AuditPS", "ReadOnlyPS", "CustomPS"}
+        expected_privileged = {"AdminPS", "PowerPS", "IAMPS", "AuditPS", "CustomPS"}
         actual_privileged = set(result.admin_permission_sets)
 
         assert expected_privileged.issubset(actual_privileged)
@@ -447,24 +454,23 @@ class TestStatisticsAnalyzerGovernance:
         assert isinstance(result, GovernanceAnalysis)
 
         # Should identify multiple types of compliance gaps
-        gap_types = {gap.gap_type for gap in result.compliance_gaps}
+        gap_types = {gap.gap_type for gap in result.view.compliance_gaps}
 
         # Expected gap types based on the test data
         expected_gaps = {
-            "orphaned_resources",
-            "privileged_access",
-            "unused_resources",
-            "cross_account_access",
+            "user_organization",
+            "excessive_privilege",
+            "resource_waste",
         }
 
         # At least some of these should be present
         assert len(gap_types.intersection(expected_gaps)) > 0
 
         # Each gap should have proper details
-        for gap in result.compliance_gaps:
+        for gap in result.view.compliance_gaps:
             assert gap.gap_type is not None
             assert gap.description is not None
-            assert gap.severity in ["low", "medium", "high", "critical"]
+            assert gap.severity in ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
             assert isinstance(gap.affected_resources, list)
 
     def test_user_indirect_access_through_groups(self, analyzer):

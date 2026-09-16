@@ -542,14 +542,11 @@ class TestStatisticsCollectorErrorHandling:
 
             mock_cache.side_effect = cache_side_effect
 
-            with patch.object(
-                collector_error, "_collect_user_group_memberships"
-            ) as mock_memberships:
-                mock_memberships.side_effect = Exception("Group membership collection failed")
+            # User collection no longer queries group memberships; group
+            # statistics owns that separate collection step.
+            result = await collector_error.collect_user_statistics()
 
-                # Should still succeed with empty group memberships
-                with pytest.raises(Exception):
-                    await collector_error.collect_user_statistics()
+        assert result.group_memberships == {}
 
     @pytest.mark.asyncio
     async def test_aws_permissions_validation_failure(self, collector_error):

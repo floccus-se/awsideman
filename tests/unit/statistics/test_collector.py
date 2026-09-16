@@ -233,10 +233,7 @@ class TestStatisticsCollector:
 
             mock_cache.side_effect = async_cache_side_effect
 
-            with patch.object(collector, "_collect_user_group_memberships") as mock_memberships:
-                mock_memberships.return_value = {"user1": ["group1"], "user2": []}
-
-                result = await collector.collect_user_statistics()
+            result = await collector.collect_user_statistics()
 
         assert isinstance(result, UserStatistics)
         assert len(result.users) == 2
@@ -245,7 +242,7 @@ class TestStatisticsCollector:
         assert result.users[0].email == "john.doe@example.com"
         assert result.users[1].user_id == "user2"
         assert result.users[1].username == "jane.smith"
-        assert result.group_memberships == {"user1": ["group1"], "user2": []}
+        assert result.group_memberships == {}
 
     @pytest.mark.asyncio
     async def test_collect_user_statistics_with_pagination(self, collector, sample_user_data):
@@ -464,10 +461,17 @@ class TestStatisticsCollector:
     @pytest.mark.asyncio
     async def test_collect_assignment_statistics_success(self, collector, sample_assignment_data):
         """Test successful assignment statistics collection."""
-        with patch.object(collector, "_get_accounts_with_assignments") as mock_accounts:
-            mock_accounts.return_value = ["123456789012", "123456789013"]
+        with patch.object(collector, "_get_from_cache_or_execute") as mock_cache:
 
-            with patch.object(collector, "_collect_assignments_parallel") as mock_assignments:
+            async def cache_side_effect(key, func, **kwargs):
+                result = func()
+                if asyncio.iscoroutine(result):
+                    return await result
+                return result
+
+            mock_cache.side_effect = cache_side_effect
+
+            with patch.object(collector, "_collect_all_assignments") as mock_assignments:
                 # Create AssignmentData objects from sample data
                 assignment_objects = []
                 for assignment in sample_assignment_data:
@@ -649,20 +653,17 @@ class TestStatisticsCollector:
 
         result = collector.get_historical_data(str(tmp_path))
 
-        # Should return data with empty users but other components
-        assert result is not None
-        assert len(result.users.users) == 0
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_retry_with_backoff_success(self, collector):
         """Test successful retry with backoff."""
         mock_func = Mock(return_value="success")
 
-        with patch.object(collector, "_retry_with_backoff") as mock_retry:
-            mock_retry.return_value = "success"
-            result = await collector._retry_with_backoff(mock_func)
+        result = await collector._retry_with_backoff(mock_func)
 
         assert result == "success"
+        mock_func.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_retry_with_backoff_eventual_success(self, collector):
@@ -678,16 +679,12 @@ class TestStatisticsCollector:
                 )
             return "success"
 
-        # Mock the actual retry implementation
-        with patch("asyncio.sleep"):  # Speed up the test
-            with patch.object(collector, "_retry_with_backoff") as mock_retry:
-                mock_retry.side_effect = lambda func: func()
-
-                # This would normally retry, but we'll simulate eventual success
-                mock_retry.return_value = "success"
-                result = await collector._retry_with_backoff(mock_func)
+        with patch("asyncio.sleep") as mock_sleep:
+            result = await collector._retry_with_backoff(mock_func)
 
         assert result == "success"
+        assert call_count == 3
+        assert mock_sleep.await_count == 2
 
     def test_log_collection_metrics(self, collector):
         """Test collection metrics logging."""

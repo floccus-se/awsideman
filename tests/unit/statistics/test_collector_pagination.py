@@ -275,7 +275,13 @@ class TestStatisticsCollectorPagination:
                 ],
                 "NextToken": "token1",
             },
-            ClientError({"Error": {"Code": "Throttling", "Message": "Rate exceeded"}}, "ListUsers"),
+            *[
+                ClientError(
+                    {"Error": {"Code": "Throttling", "Message": "Rate exceeded"}},
+                    "ListUsers",
+                )
+                for _ in range(4)
+            ],
         ]
 
         # Mock identity store ID lookup
@@ -298,8 +304,9 @@ class TestStatisticsCollectorPagination:
 
             mock_cache.side_effect = cache_side_effect
 
-            with pytest.raises(ClientError):
-                await collector.collect_user_statistics()
+            with patch("asyncio.sleep"):
+                with pytest.raises(ClientError):
+                    await collector.collect_user_statistics()
 
     @pytest.mark.asyncio
     async def test_pagination_rate_limiting(self, collector):
@@ -489,8 +496,8 @@ class TestStatisticsCollectorPagination:
         assert "NextToken" not in calls[0][1]
 
         # Subsequent calls should use the correct tokens
-        assert calls[1][1]["NextToken"] == "first_token"
-        assert calls[2][1]["NextToken"] == "second_token"
+        assert calls[1][1]["NextToken"] == "second_token"
+        assert calls[2][1]["NextToken"] == "third_token"
 
         assert len(result.users) == 3
 
