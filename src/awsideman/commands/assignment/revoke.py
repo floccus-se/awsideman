@@ -5,7 +5,8 @@ in AWS Identity Center. It supports both single-account and multi-account revoca
 with various filtering options.
 """
 
-from typing import Any, Optional
+import time
+from typing import Any, Dict, Optional
 
 import typer
 from botocore.exceptions import ClientError
@@ -28,6 +29,37 @@ from .helpers import (
 )
 
 config = Config()
+
+
+def _delete_account_assignment_with_conflict_retry(
+    sso_admin_client: Any,
+    delete_params: Dict[str, Any],
+    max_attempts: int = 5,
+    base_delay: float = 1.0,
+) -> Dict[str, Any]:
+    """Delete an account assignment, retrying propagation conflicts.
+
+    IAM Identity Center returns ConflictException when a previous successful
+    write has not propagated yet. Retrying here also keeps cache wrappers out
+    of the command's user-facing traceback.
+    """
+    for attempt in range(max_attempts):
+        try:
+            return sso_admin_client.delete_account_assignment(**delete_params)
+        except ClientError as error:
+            error_code = error.response.get("Error", {}).get("Code", "")
+            if error_code != "ConflictException" or attempt == max_attempts - 1:
+                raise
+
+            delay = base_delay * (2**attempt)
+            console.print(
+                "[yellow]A previous assignment change is still being processed; "
+                f"retrying revocation in {delay:.1f}s "
+                f"(attempt {attempt + 2}/{max_attempts}).[/yellow]"
+            )
+            time.sleep(delay)
+
+    raise RuntimeError("Account assignment deletion retry loop ended unexpectedly")
 
 
 def _get_all_accounts(aws_client: AWSClientManager) -> list:
@@ -137,7 +169,7 @@ def revoke_permission_set(
     batch_size: int = typer.Option(
         10,
         "--batch-size",
-        help="Number of accounts to process concurrently (for multi-account operations)",
+        help="Requested concurrent accounts (capped at the API-safe limit of 10)",
     ),
     continue_on_error: bool = typer.Option(
         True,
@@ -432,7 +464,10 @@ def revoke_multi_account_with_filter(
 
         # Create performance-optimized batch processor
         batch_processor, perf_config = create_performance_optimized_processor(
-            aws_client_manager=aws_client, account_count=len(accounts), operation_type="revoke"
+            aws_client_manager=aws_client,
+            account_count=len(accounts),
+            operation_type="revoke",
+            batch_size=batch_size,
         )
         batch_processor.set_resource_resolver(instance_arn, identity_store_id)
 
@@ -738,7 +773,10 @@ def revoke_multi_account_explicit(
 
         # Create performance-optimized batch processor
         batch_processor, perf_config = create_performance_optimized_processor(
-            aws_client_manager=aws_client, account_count=len(accounts), operation_type="revoke"
+            aws_client_manager=aws_client,
+            account_count=len(accounts),
+            operation_type="revoke",
+            batch_size=batch_size,
         )
         batch_processor.set_resource_resolver(instance_arn, identity_store_id)
 
@@ -1092,7 +1130,10 @@ def revoke_multi_account_advanced(
 
         # Create performance-optimized batch processor
         batch_processor, perf_config = create_performance_optimized_processor(
-            aws_client_manager=aws_client, account_count=len(accounts), operation_type="revoke"
+            aws_client_manager=aws_client,
+            account_count=len(accounts),
+            operation_type="revoke",
+            batch_size=batch_size,
         )
         batch_processor.set_resource_resolver(instance_arn, identity_store_id)
 
@@ -1502,129 +1543,6 @@ def revoke_single_account(
 
                     principal_display_name = "Unknown"
 
-                # Show that we're now proceeding with the actual revocation
-                console.print()
-                console.print("[blue]Initiating assignment revocation...[/blue]")
-
-                # Revoke the assignment
-                # Create the revocation parameters
-                delete_params = {
-                    "InstanceArn": instance_arn,
-                    "TargetId": account_id,
-                    "TargetType": "AWS_ACCOUNT",
-                    "PermissionSetArn": permission_set_arn,
-                    "PrincipalType": principal_type,
-                    "PrincipalId": principal_id,
-                }
-
-                # Make the API call to delete the assignment
-                response = sso_admin_client.delete_account_assignment(**delete_params)
-
-                # Extract the request ID for tracking
-                request_id = response.get("AccountAssignmentDeletionStatus", {}).get("RequestId")
-
-                # The assignment deletion is asynchronous, so we get a request status
-                assignment_status = response.get("AccountAssignmentDeletionStatus", {})
-                status = assignment_status.get("Status", "UNKNOWN")
-
-                # Handle the response and display appropriate output
-                if status == "IN_PROGRESS":
-                    console.print("[green]✓ Assignment revocation initiated successfully.[/green]")
-                    console.print()
-                    console.print("[bold]Revoked Assignment Details:[/bold]")
-                    console.print(f"  Permission Set: [green]{permission_set_display_name}[/green]")
-                    console.print(
-                        f"  Principal: [cyan]{principal_display_name}[/cyan] ({principal_type})"
-                    )
-                    console.print(f"  Account ID: [yellow]{account_id}[/yellow]")
-                    console.print()
-                    if request_id:
-                        console.print(f"Request ID: [dim]{request_id}[/dim]")
-                    console.print(
-                        "[yellow]Note: Assignment revocation is asynchronous and may take a few moments to complete.[/yellow]"
-                    )
-                    console.print(
-                        "[yellow]You can verify the revocation using 'awsideman assignment list' command.[/yellow]"
-                    )
-
-                    # Log the successful revocation operation
-                    log_individual_operation(
-                        "revoke",
-                        principal_id,
-                        principal_type,
-                        principal_display_name,
-                        permission_set_arn,
-                        permission_set_display_name,
-                        account_id,
-                        success=True,
-                        request_id=request_id,
-                        profile=profile_name,
-                    )
-
-                    # Invalidate cache to ensure assignment data is fresh
-                    try:
-                        # Clear internal data storage to ensure fresh data
-                        if aws_client.is_caching_enabled():
-                            aws_client.clear_cache()
-
-                    except Exception:
-                        # Don't fail the command if cache invalidation fails
-                        pass
-
-                elif status == "SUCCEEDED":
-                    console.print("[green]✓ Assignment revoked successfully.[/green]")
-                    console.print()
-                    console.print("[bold]Revoked Assignment Details:[/bold]")
-                    console.print(f"  Permission Set: [green]{permission_set_display_name}[/green]")
-                    console.print(
-                        f"  Principal: [cyan]{principal_display_name}[/cyan] ({principal_type})"
-                    )
-                    console.print(f"  Account ID: [yellow]{account_id}[/yellow]")
-                    console.print()
-                    console.print(
-                        "[green]The principal no longer has access to the specified account through this permission set.[/green]"
-                    )
-
-                    # Log the successful revocation operation
-                    log_individual_operation(
-                        "revoke",
-                        principal_id,
-                        principal_type,
-                        principal_display_name,
-                        permission_set_arn,
-                        permission_set_display_name,
-                        account_id,
-                        success=True,
-                        request_id=request_id,
-                        profile=profile_name,
-                    )
-                elif status == "FAILED":
-                    failure_reason = assignment_status.get("FailureReason", "Unknown error")
-                    console.print(f"[red]✗ Assignment revocation failed: {failure_reason}[/red]")
-                    console.print()
-                    console.print("[bold]Attempted Revocation:[/bold]")
-                    console.print(f"  Permission Set: [green]{permission_set_display_name}[/green]")
-                    console.print(
-                        f"  Principal: [cyan]{principal_display_name}[/cyan] ({principal_type})"
-                    )
-                    console.print(f"  Account ID: [yellow]{account_id}[/yellow]")
-                    raise typer.Exit(1)
-                else:
-                    console.print(f"[yellow]Assignment revocation status: {status}[/yellow]")
-                    console.print()
-                    console.print("[bold]Assignment Details:[/bold]")
-                    console.print(f"  Permission Set: [green]{permission_set_display_name}[/green]")
-                    console.print(
-                        f"  Principal: [cyan]{principal_display_name}[/cyan] ({principal_type})"
-                    )
-                    console.print(f"  Account ID: [yellow]{account_id}[/yellow]")
-                    console.print()
-                    if request_id:
-                        console.print(f"Request ID: [dim]{request_id}[/dim]")
-                    console.print(
-                        "[yellow]Please check the assignment status using 'awsideman assignment list' command.[/yellow]"
-                    )
-
             except ClientError as e:
                 # Handle AWS API errors
                 error_code = e.response.get("Error", {}).get("Code", "Unknown")
@@ -1753,8 +1671,20 @@ def revoke_single_account(
         "PrincipalId": principal_id,
     }
 
-    # Make the API call to delete the assignment
-    response = sso_admin_client.delete_account_assignment(**delete_params)
+    # Make exactly one logical delete call. Propagation conflicts from a prior
+    # successful write are retried with exponential backoff.
+    try:
+        response = _delete_account_assignment_with_conflict_retry(sso_admin_client, delete_params)
+    except ClientError as error:
+        error_code = error.response.get("Error", {}).get("Code", "Unknown")
+        error_message = error.response.get("Error", {}).get("Message", str(error))
+        console.print(f"[red]✗ Assignment revocation failed ({error_code}): {error_message}[/red]")
+        if error_code == "ConflictException":
+            console.print(
+                "[yellow]The conflicting assignment operation did not finish before "
+                "the retry window expired. Please try again shortly.[/yellow]"
+            )
+        raise typer.Exit(1)
 
     # Extract the request ID for tracking
     request_id = response.get("AccountAssignmentDeletionStatus", {}).get("RequestId")

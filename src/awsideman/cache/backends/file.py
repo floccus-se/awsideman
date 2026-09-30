@@ -105,7 +105,8 @@ class FileBackend(CacheBackend):
             with open(cache_file, "rb") as f:
                 file_content = f.read()
 
-            # Check if it's the new encrypted format
+            # Check if it's the binary format (JSON metadata header + payload).
+            # This format is used for both encrypted data and non-JSON bytes.
             if len(file_content) >= 4:
                 try:
                     # Try to read metadata length
@@ -115,22 +116,24 @@ class FileBackend(CacheBackend):
                         metadata_json = file_content[4 : 4 + metadata_length]
                         metadata = json.loads(metadata_json.decode("utf-8"))
 
-                        if metadata.get("encrypted", False):
-                            # This is encrypted format
-                            # Check if expired
+                        if "encrypted" in metadata:
+                            # Check expiry for either encrypted or raw binary data.
                             if time.time() > metadata["created_at"] + metadata["ttl"]:
                                 self._remove_cache_file(cache_file)
                                 return None
 
-                            # Decrypt the data if encryption is enabled
-                            encrypted_data = file_content[4 + metadata_length :]
+                            payload = file_content[4 + metadata_length :]
+
+                            if not metadata["encrypted"]:
+                                logger.debug(f"File backend cache hit for key: {key} (binary)")
+                                return payload
+
+                            # Decrypt encrypted payloads when encryption is available.
 
                             if self.encryption_enabled and self.encryption_provider:
                                 try:
                                     # Decrypt the data
-                                    decrypted_data = self.encryption_provider.decrypt(
-                                        encrypted_data
-                                    )
+                                    decrypted_data = self.encryption_provider.decrypt(payload)
 
                                     # Re-serialize as pickle to match the expected format
                                     import pickle
@@ -152,8 +155,8 @@ class FileBackend(CacheBackend):
                                 logger.warning(
                                     f"Found encrypted data but encryption is disabled for key: {key}"
                                 )
-                                return encrypted_data
-                except (ValueError, json.JSONDecodeError, KeyError):
+                                return payload
+                except (ValueError, json.JSONDecodeError, KeyError, UnicodeDecodeError):
                     # Not the new format, fall through to old format
                     pass
 
@@ -507,8 +510,8 @@ class FileBackend(CacheBackend):
                         with open(cache_file, "rb") as f:
                             file_content = f.read()
 
-                        # Check if it's the new encrypted format
-                        is_encrypted_format = False
+                        # Check if it's the binary format (encrypted or raw).
+                        is_binary_format = False
                         if len(file_content) >= 4:
                             try:
                                 metadata_length = int.from_bytes(file_content[:4], byteorder="big")
@@ -516,17 +519,17 @@ class FileBackend(CacheBackend):
                                     metadata_json = file_content[4 : 4 + metadata_length]
                                     metadata = json.loads(metadata_json.decode("utf-8"))
 
-                                    if metadata.get("encrypted", False):
-                                        is_encrypted_format = True
+                                    if "encrypted" in metadata:
+                                        is_binary_format = True
                                         # Check if expired
                                         if time.time() > metadata["created_at"] + metadata["ttl"]:
                                             expired_entries += 1
                                         else:
                                             valid_entries += 1
-                            except (ValueError, json.JSONDecodeError, KeyError):
+                            except (ValueError, json.JSONDecodeError, KeyError, UnicodeDecodeError):
                                 pass
 
-                        if not is_encrypted_format:
+                        if not is_binary_format:
                             # Try old JSON format
                             try:
                                 with open(cache_file, "r", encoding="utf-8") as f:
@@ -636,7 +639,7 @@ class FileBackend(CacheBackend):
                         with open(cache_file, "rb") as f:
                             file_content = f.read()
 
-                        # Check if it's the new encrypted format
+                        # Check if it's the binary format (encrypted or raw).
                         if len(file_content) >= 4:
                             try:
                                 # Try to read metadata length
@@ -646,8 +649,8 @@ class FileBackend(CacheBackend):
                                     metadata_json = file_content[4 : 4 + metadata_length]
                                     metadata = json.loads(metadata_json.decode("utf-8"))
 
-                                    if metadata.get("encrypted", False):
-                                        # This is encrypted format - extract metadata from header
+                                    if "encrypted" in metadata:
+                                        # Extract metadata from the binary header.
                                         created_at = metadata.get("created_at", 0)
                                         ttl = metadata.get("ttl", 0)
                                         operation = metadata.get("operation", "unknown")
@@ -1111,7 +1114,7 @@ class FileBackend(CacheBackend):
             with open(cache_file, "rb") as f:
                 file_content = f.read()
 
-            # Check if it's the new encrypted format
+            # Check if it's the binary format (encrypted or raw).
             if len(file_content) >= 4:
                 try:
                     # Try to read metadata length
@@ -1121,7 +1124,7 @@ class FileBackend(CacheBackend):
                         metadata_json = file_content[4 : 4 + metadata_length]
                         metadata = json.loads(metadata_json.decode("utf-8"))
 
-                        if metadata.get("encrypted", False):
+                        if "encrypted" in metadata:
                             # Check if expired
                             return current_time > float(metadata["created_at"]) + float(
                                 metadata["ttl"]

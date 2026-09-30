@@ -25,6 +25,7 @@ from .multi_account_errors import (
     MultiAccountErrorSummary,
 )
 from .multi_account_progress import MultiAccountProgressTracker
+from .performance_optimizer import MAX_CONCURRENT_ACCOUNT_CHANGES
 from .resolver import ResourceResolver
 
 console = Console()
@@ -62,7 +63,9 @@ class MultiAccountBatchProcessor(BatchProcessor):
 
         # Rate limiting configuration (legacy - now handled by intelligent backoff)
         self.rate_limit_delay = 0.1  # Delay between account operations in seconds
-        self.max_concurrent_accounts = min(batch_size, 10)  # Limit concurrent account operations
+        self.max_concurrent_accounts = min(
+            batch_size, MAX_CONCURRENT_ACCOUNT_CHANGES
+        )  # Limit concurrent account operations
 
         # Multi-account results tracking
         self.multi_account_results: Optional[MultiAccountResults] = None
@@ -989,7 +992,10 @@ class MultiAccountBatchProcessor(BatchProcessor):
             max_concurrent: Maximum number of concurrent account operations
         """
         self.rate_limit_delay = max(0.0, delay)
-        self.max_concurrent_accounts = max(1, min(max_concurrent, self.batch_size))
+        self.max_concurrent_accounts = max(
+            1,
+            min(max_concurrent, self.batch_size, MAX_CONCURRENT_ACCOUNT_CHANGES),
+        )
 
         console.print(
             f"[dim]Rate limiting configured: {self.rate_limit_delay}s delay, {self.max_concurrent_accounts} max concurrent[/dim]"

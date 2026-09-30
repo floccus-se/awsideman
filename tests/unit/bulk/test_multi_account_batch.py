@@ -127,6 +127,14 @@ class TestMultiAccountBatchProcessor:
         multi_account_processor.configure_rate_limiting(0.1, 20)
         assert multi_account_processor.max_concurrent_accounts == 5  # Limited by batch_size
 
+    def test_concurrency_cannot_exceed_identity_center_api_limit(self, mock_aws_client_manager):
+        """Explicit rate-limit settings must retain the API-derived ceiling."""
+        processor = MultiAccountBatchProcessor(mock_aws_client_manager, batch_size=50)
+
+        processor.configure_rate_limiting(0.1, 50)
+
+        assert processor.max_concurrent_accounts == 10
+
     @pytest.mark.asyncio
     async def test_process_multi_account_operation_validation_failure(
         self, multi_account_processor, sample_accounts

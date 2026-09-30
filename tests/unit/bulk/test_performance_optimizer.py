@@ -5,6 +5,8 @@ from unittest.mock import Mock
 import pytest
 
 from src.awsideman.bulk.performance_optimizer import (
+    MAX_CONCURRENT_ACCOUNT_CHANGES,
+    MIN_BATCH_INTERVAL_SECONDS,
     PerformanceConfig,
     PerformanceOptimizer,
     create_performance_optimized_processor,
@@ -23,33 +25,33 @@ class TestPerformanceOptimizer:
         """Test configuration for small organizations."""
         config = optimizer.get_optimized_config(account_count=5, operation_type="assign")
 
-        assert config.max_concurrent_accounts <= 15
+        assert config.max_concurrent_accounts == 5
         assert config.batch_size == 5  # Should match account count for small orgs
-        assert config.rate_limit_delay == 0.1
+        assert config.rate_limit_delay == MIN_BATCH_INTERVAL_SECONDS
 
     def test_medium_organization_config(self, optimizer):
         """Test configuration for medium organizations."""
         config = optimizer.get_optimized_config(account_count=30, operation_type="assign")
 
-        assert config.max_concurrent_accounts <= 25
-        assert config.batch_size <= 50
-        assert config.rate_limit_delay == 0.05
+        assert config.max_concurrent_accounts == MAX_CONCURRENT_ACCOUNT_CHANGES
+        assert config.batch_size == MAX_CONCURRENT_ACCOUNT_CHANGES
+        assert config.rate_limit_delay == MIN_BATCH_INTERVAL_SECONDS
 
     def test_large_organization_config(self, optimizer):
         """Test configuration for large organizations."""
         config = optimizer.get_optimized_config(account_count=100, operation_type="assign")
 
-        assert config.max_concurrent_accounts == 30
-        assert config.batch_size == 50
-        assert config.rate_limit_delay == 0.02
+        assert config.max_concurrent_accounts == MAX_CONCURRENT_ACCOUNT_CHANGES
+        assert config.batch_size == MAX_CONCURRENT_ACCOUNT_CHANGES
+        assert config.rate_limit_delay == MIN_BATCH_INTERVAL_SECONDS
 
     def test_revoke_operation_optimization(self, optimizer):
-        """Test that revoke operations get more aggressive settings."""
+        """Test that revoke operations obey the same shared API quota."""
         assign_config = optimizer.get_optimized_config(account_count=30, operation_type="assign")
         revoke_config = optimizer.get_optimized_config(account_count=30, operation_type="revoke")
 
-        assert revoke_config.max_concurrent_accounts >= assign_config.max_concurrent_accounts
-        assert revoke_config.rate_limit_delay <= assign_config.rate_limit_delay
+        assert revoke_config.max_concurrent_accounts == assign_config.max_concurrent_accounts
+        assert revoke_config.rate_limit_delay == assign_config.rate_limit_delay
 
     def test_performance_improvement_estimation(self, optimizer):
         """Test performance improvement estimation."""
@@ -74,10 +76,9 @@ class TestPerformanceOptimizer:
 
         optimizer.apply_optimizations(mock_processor, account_count=29, operation_type="assign")
 
-        # Should have updated the processor settings
-        assert mock_processor.batch_size > 10
-        assert mock_processor.max_concurrent_accounts > 10
-        assert mock_processor.rate_limit_delay < 0.1
+        assert mock_processor.batch_size == MAX_CONCURRENT_ACCOUNT_CHANGES
+        assert mock_processor.max_concurrent_accounts == MAX_CONCURRENT_ACCOUNT_CHANGES
+        assert mock_processor.rate_limit_delay == MIN_BATCH_INTERVAL_SECONDS
 
     def test_create_performance_optimized_processor(self):
         """Test the factory function for creating optimized processors."""
@@ -89,8 +90,23 @@ class TestPerformanceOptimizer:
 
         assert processor is not None
         assert isinstance(config, PerformanceConfig)
-        assert config.max_concurrent_accounts > 10  # Should be optimized
-        assert config.batch_size > 10  # Should be optimized
+        assert config.max_concurrent_accounts == MAX_CONCURRENT_ACCOUNT_CHANGES
+        assert config.batch_size == MAX_CONCURRENT_ACCOUNT_CHANGES
+
+    def test_requested_batch_size_is_preserved_below_api_ceiling(self):
+        """A smaller CLI batch size should not be discarded by the optimizer."""
+        mock_aws_client = Mock()
+
+        processor, config = create_performance_optimized_processor(
+            aws_client_manager=mock_aws_client,
+            account_count=29,
+            operation_type="revoke",
+            batch_size=4,
+        )
+
+        assert processor.batch_size == 4
+        assert processor.max_concurrent_accounts == 4
+        assert config.batch_size == 4
 
 
 class TestPerformanceConfig:
@@ -100,9 +116,9 @@ class TestPerformanceConfig:
         """Test default configuration values."""
         config = PerformanceConfig()
 
-        assert config.max_concurrent_accounts == 25
-        assert config.batch_size == 50
-        assert config.rate_limit_delay == 0.05
+        assert config.max_concurrent_accounts == MAX_CONCURRENT_ACCOUNT_CHANGES
+        assert config.batch_size == MAX_CONCURRENT_ACCOUNT_CHANGES
+        assert config.rate_limit_delay == MIN_BATCH_INTERVAL_SECONDS
         assert config.account_timeout == 60
         assert config.max_retries == 2
         assert config.use_session_reuse is True

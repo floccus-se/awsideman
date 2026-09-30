@@ -90,6 +90,24 @@ class TestFileBackend:
         else:
             assert False, "Expected to get data back from cache"
 
+    def test_set_and_get_raw_binary_data(self):
+        """Test the metadata-header format used for non-JSON bytes."""
+        binary_data = b"\x80\x04\x95\xce\x00non-utf8-cache-data"
+
+        self.backend.set("binary_key", binary_data, ttl=1800, operation="binary_op")
+
+        assert self.backend.get("binary_key") == binary_data
+        assert self.backend.path_manager.get_cache_file_path("binary_key").exists()
+
+    def test_raw_binary_data_is_counted_as_valid(self):
+        """Binary cache entries must not be reported as corrupted JSON."""
+        self.backend.set("binary_stats_key", b"\x80\x04\xce", operation="binary_op")
+
+        stats = self.backend.get_stats()
+
+        assert stats["valid_entries"] == 1
+        assert stats["corrupted_entries"] == 0
+
     def test_get_expired_entry_removed(self):
         """Test that expired entries are automatically removed."""
         # Create an expired cache file manually
@@ -203,17 +221,14 @@ class TestFileBackend:
             assert exc_info.value.backend_type == "file"
 
     def test_set_invalid_data_error(self):
-        """Test set operation with invalid data that cannot be processed."""
+        """Test arbitrary bytes are stored and returned through the binary format."""
         # Create data that looks like JSON but will cause processing errors
         invalid_data = b'{"invalid": "json with unclosed string'
 
-        # This should still work as it will be treated as encrypted data
         self.backend.set("invalid_data_key", invalid_data, operation="test_op")
 
         result = self.backend.get("invalid_data_key")
-        # The file backend should handle invalid JSON gracefully and return the original data
-        # Since the file backend doesn't handle invalid JSON gracefully, we expect None
-        assert result is None
+        assert result == invalid_data
 
     def test_invalidate_specific_key(self):
         """Test invalidating a specific cache key."""

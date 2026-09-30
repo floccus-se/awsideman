@@ -198,7 +198,7 @@ def assign_permission_set(
     batch_size: int = typer.Option(
         10,
         "--batch-size",
-        help="Number of accounts to process concurrently (for multi-account operations)",
+        help="Requested concurrent accounts (capped at the API-safe limit of 10)",
     ),
     continue_on_error: bool = typer.Option(
         True,
@@ -479,7 +479,10 @@ def assign_multi_account_with_filter(
 
         # Create performance-optimized batch processor
         batch_processor, perf_config = create_performance_optimized_processor(
-            aws_client_manager=aws_client, account_count=len(accounts), operation_type="assign"
+            aws_client_manager=aws_client,
+            account_count=len(accounts),
+            operation_type="assign",
+            batch_size=batch_size,
         )
         batch_processor.set_resource_resolver(instance_arn, identity_store_id)
 
@@ -1091,7 +1094,10 @@ def assign_multi_account_explicit(
 
         # Create performance-optimized batch processor
         batch_processor, perf_config = create_performance_optimized_processor(
-            aws_client_manager=aws_client, account_count=len(accounts), operation_type="assign"
+            aws_client_manager=aws_client,
+            account_count=len(accounts),
+            operation_type="assign",
+            batch_size=batch_size,
         )
         batch_processor.set_resource_resolver(instance_arn, identity_store_id)
 
@@ -1430,7 +1436,10 @@ def assign_multi_account_advanced(
 
         # Create performance-optimized batch processor
         batch_processor, perf_config = create_performance_optimized_processor(
-            aws_client_manager=aws_client, account_count=len(accounts), operation_type="assign"
+            aws_client_manager=aws_client,
+            account_count=len(accounts),
+            operation_type="assign",
+            batch_size=batch_size,
         )
         batch_processor.set_resource_resolver(instance_arn, identity_store_id)
 

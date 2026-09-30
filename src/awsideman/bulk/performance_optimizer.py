@@ -15,17 +15,25 @@ from rich.console import Console
 
 console = Console()
 
+# IAM Identity Center has a collective limit of 20 API calls per second. Each
+# assignment change performs one ListAccountAssignments call and one mutation,
+# so ten concurrent account changes consume the documented allowance.
+IAM_IDENTITY_CENTER_TPS_LIMIT = 20
+API_CALLS_PER_ACCOUNT_CHANGE = 2
+MAX_CONCURRENT_ACCOUNT_CHANGES = IAM_IDENTITY_CENTER_TPS_LIMIT // API_CALLS_PER_ACCOUNT_CHANGE
+MIN_BATCH_INTERVAL_SECONDS = 1.0
+
 
 @dataclass
 class PerformanceConfig:
     """Configuration for performance optimization."""
 
     # Parallelization settings
-    max_concurrent_accounts: int = 25  # Increased from 10
-    batch_size: int = 50  # Increased from 10
+    max_concurrent_accounts: int = MAX_CONCURRENT_ACCOUNT_CHANGES
+    batch_size: int = MAX_CONCURRENT_ACCOUNT_CHANGES
 
-    # Rate limiting (reduced for better performance)
-    rate_limit_delay: float = 0.05  # Reduced from 0.1s
+    # Keep batches within the collective IAM Identity Center API TPS quota.
+    rate_limit_delay: float = MIN_BATCH_INTERVAL_SECONDS
 
     # Timeout settings
     account_timeout: int = 60  # Reduced from 300s (5min) to 60s
@@ -72,28 +80,12 @@ class PerformanceOptimizer:
         """
         config = PerformanceConfig()
 
-        # Scale parallelization based on account count
-        if account_count <= 10:
-            # Small organizations - moderate parallelization
-            config.max_concurrent_accounts = min(account_count, 15)
-            config.batch_size = account_count
-            config.rate_limit_delay = 0.1
-        elif account_count <= 50:
-            # Medium organizations - high parallelization
-            config.max_concurrent_accounts = min(account_count, 25)
-            config.batch_size = min(account_count, 50)
-            config.rate_limit_delay = 0.05
-        else:
-            # Large organizations - maximum parallelization
-            config.max_concurrent_accounts = 30
-            config.batch_size = 50
-            config.rate_limit_delay = 0.02
-
-        # Adjust for operation type
-        if operation_type == "revoke":
-            # Revoke operations can be slightly more aggressive
-            config.max_concurrent_accounts = min(config.max_concurrent_accounts + 5, 35)
-            config.rate_limit_delay *= 0.8
+        # A change uses a read plus a write. Keep every batch at or below the
+        # collective API limit instead of increasing concurrency with org size.
+        safe_batch_size = min(account_count, MAX_CONCURRENT_ACCOUNT_CHANGES)
+        config.max_concurrent_accounts = max(1, safe_batch_size)
+        config.batch_size = max(1, safe_batch_size)
+        config.rate_limit_delay = MIN_BATCH_INTERVAL_SECONDS
 
         # Adjust timeouts based on account count
         if account_count > 100:
@@ -266,7 +258,10 @@ class ParallelAccountProcessor:
 
 
 def create_performance_optimized_processor(
-    aws_client_manager: Any, account_count: int, operation_type: str = "assign"
+    aws_client_manager: Any,
+    account_count: int,
+    operation_type: str = "assign",
+    batch_size: Optional[int] = None,
 ) -> Any:
     """
     Factory function to create a performance-optimized batch processor.
@@ -275,6 +270,8 @@ def create_performance_optimized_processor(
         aws_client_manager: AWS client manager
         account_count: Number of accounts to process
         operation_type: Type of operation
+        batch_size: Optional user-requested batch size. Values above the safe
+            API-derived ceiling are capped; smaller values are preserved.
 
     Returns:
         Optimized MultiAccountBatchProcessor
@@ -285,13 +282,23 @@ def create_performance_optimized_processor(
     optimizer = PerformanceOptimizer()
     config = optimizer.get_optimized_config(account_count, operation_type)
 
+    if batch_size is not None:
+        requested_batch_size = max(1, batch_size)
+        config.batch_size = min(config.batch_size, requested_batch_size)
+        config.max_concurrent_accounts = min(config.max_concurrent_accounts, requested_batch_size)
+
     # Create processor with optimized batch size
     processor = MultiAccountBatchProcessor(
         aws_client_manager=aws_client_manager, batch_size=config.batch_size
     )
 
-    # Apply optimizations
-    optimizer.apply_optimizations(processor, account_count, operation_type)
+    # Apply the already-computed configuration. Calling apply_optimizations()
+    # here would discard a smaller batch size explicitly requested by the user.
+    processor.batch_size = config.batch_size
+    processor.max_concurrent_accounts = config.max_concurrent_accounts
+    processor.rate_limit_delay = config.rate_limit_delay
+    processor.retry_handler.max_retries = config.max_retries
+    processor.retry_handler.base_delay = config.retry_delay
 
     return processor, config
 
