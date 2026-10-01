@@ -5,6 +5,8 @@ Tests various encryption implementations including Fernet, AES,
 and no-op encryption providers with proper key management.
 """
 
+from pathlib import Path
+
 import pytest
 
 from src.awsideman.backup_restore.encryption import (
@@ -15,6 +17,12 @@ from src.awsideman.backup_restore.encryption import (
     NoOpEncryptionProvider,
     TransitEncryptionProvider,
 )
+
+
+@pytest.fixture(autouse=True)
+def isolated_key_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep fallback encryption keys in the test's writable directory."""
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
 
 class TestFernetEncryptionProvider:

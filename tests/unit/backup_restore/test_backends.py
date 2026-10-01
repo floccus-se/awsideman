@@ -671,7 +671,7 @@ class TestStorageBackendFactory:
         backend = StorageBackendFactory.create_filesystem_backend("/tmp/test")
 
         assert isinstance(backend, FileSystemStorageBackend)
-        assert str(backend.base_path) == "/tmp/test/profiles/default"
+        assert str(backend.base_path) == "/tmp/test"
 
     def test_create_filesystem_backend_with_options(self):
         """Test creating filesystem backend with additional options."""

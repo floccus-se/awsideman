@@ -4,13 +4,16 @@ import asyncio
 from datetime import datetime
 from typing import Optional
 
+import click
 import typer
+from click.core import ParameterSource
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from ...backup_restore.backends import FileSystemStorageBackend, S3StorageBackend
 from ...backup_restore.collector import IdentityCenterCollector
+from ...backup_restore.encryption import ManagedAESEncryptionProvider
 from ...backup_restore.manager import BackupManager
 from ...backup_restore.models import BackupOptions, BackupType, ResourceType
 from ...backup_restore.storage import StorageEngine
@@ -22,35 +25,39 @@ config = Config()
 
 
 def create_backup(
-    backup_type: Optional[str] = typer.Option(
-        None, "--type", "-t", help="Backup type: full or incremental (overrides config default)"
+    backup_type: str = typer.Option(
+        "full", "--type", "-t", help="Backup type: full or incremental (configurable default)"
     ),
-    resources: Optional[str] = typer.Option(
-        None,
+    resources: str = typer.Option(
+        "all",
         "--resources",
         "-r",
-        help="Comma-separated list of resources to backup (users,groups,permission_sets,assignments,all)",
+        help="Resources: users,groups,permission_sets,assignments,all (configurable default)",
     ),
     since: Optional[str] = typer.Option(
         None,
         "--since",
         "-s",
         help="For incremental backups: start date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)",
+        show_default=False,
     ),
-    storage_backend: Optional[str] = typer.Option(
-        None, "--storage", help="Storage backend: filesystem or s3 (overrides config default)"
+    storage_backend: str = typer.Option(
+        "filesystem", "--storage", help="Storage backend: filesystem or s3 (configurable default)"
     ),
     storage_path: Optional[str] = typer.Option(
-        None, "--storage-path", help="Storage path (directory for filesystem, bucket/prefix for s3)"
+        None,
+        "--storage-path",
+        help="Storage path from config (filesystem fallback: ~/.awsideman/backups)",
+        show_default=False,
     ),
     no_encryption: bool = typer.Option(
         False, "--no-encryption", help="Disable backup encryption (overrides config)"
     ),
     no_compression: bool = typer.Option(
-        False, "--no-compression", help="Disable backup compression (overrides config)"
+        False, "--no-compression", help="Disable backup compression (encryption still applies)"
     ),
-    include_inactive: Optional[bool] = typer.Option(
-        None,
+    include_inactive: bool = typer.Option(
+        False,
         "--include-inactive",
         help="Include inactive users in backup (overrides config default)",
     ),
@@ -61,9 +68,17 @@ def create_backup(
         False, "--delete-duplicates", help="Delete duplicate backups if found (use with caution)"
     ),
     output_format: str = typer.Option(
-        "table", "--format", "-f", help="Output format: table or json"
+        "table", "--output-format", help="Terminal output: table or json (default: table)"
     ),
-    profile: Optional[str] = typer.Option(None, "--profile", help="AWS profile to use"),
+    storage_format: str = typer.Option(
+        "binary",
+        "--format",
+        "-f",
+        help="Backup data format: binary (gzip JSON) or json (default: binary)",
+    ),
+    profile: Optional[str] = typer.Option(
+        None, "--profile", help="AWS profile to use", show_default=False
+    ),
 ) -> None:
     """Create a new backup of AWS Identity Center configuration.
 
@@ -93,26 +108,37 @@ def create_backup(
 
         # Load backup configuration defaults
         backup_config = config.get("backup", {})
+        context = click.get_current_context(silent=True)
+        if context:
+            if context.get_parameter_source("backup_type") == ParameterSource.DEFAULT:
+                backup_type = backup_config.get("defaults", {}).get("backup_type", "full")
+            if context.get_parameter_source("resources") == ParameterSource.DEFAULT:
+                resources = backup_config.get("defaults", {}).get("resource_types", "all")
+            if context.get_parameter_source("storage_backend") == ParameterSource.DEFAULT:
+                storage_backend = backup_config.get("storage", {}).get(
+                    "default_backend", "filesystem"
+                )
+            if context.get_parameter_source("include_inactive") == ParameterSource.DEFAULT:
+                include_inactive = backup_config.get("defaults", {}).get(
+                    "include_inactive_users", False
+                )
 
-        # Apply configuration defaults if command line options not provided
-        if backup_type is None:
-            backup_type = backup_config.get("defaults", {}).get("backup_type", "full")
-
-        if storage_backend is None:
-            storage_backend = backup_config.get("storage", {}).get("default_backend", "filesystem")
-
-        if include_inactive is None:
-            include_inactive = backup_config.get("defaults", {}).get(
-                "include_inactive_users", False
+        if storage_format.lower() not in {"binary", "json"}:
+            raise typer.BadParameter("Backup format must be binary or json", param_hint="--format")
+        if output_format.lower() not in {"table", "json"}:
+            raise typer.BadParameter(
+                "Output format must be table or json", param_hint="--output-format"
+            )
+        if (
+            storage_format.lower() == "json"
+            and not no_encryption
+            and backup_config.get("encryption", {}).get("enabled", True)
+        ):
+            raise typer.BadParameter(
+                "Readable JSON requires --no-encryption", param_hint="--format"
             )
 
-        # Get default resource types if not specified
-        if not resources:
-            config_resource_types = backup_config.get("defaults", {}).get("resource_types", "all")
-            if config_resource_types != "all":
-                resources = config_resource_types
-
-        # Now validate input parameters after defaults are applied
+        # Validate input parameters after loading effective defaults.
         if backup_type.lower() not in ["full", "incremental"]:
             console.print(f"[red]Error: Invalid backup type '{backup_type}'.[/red]")
             console.print("[yellow]Backup type must be either 'full' or 'incremental'.[/yellow]")
@@ -181,8 +207,14 @@ def create_backup(
             resource_types=resource_types if resource_types else [ResourceType.ALL],
             since=since_date,
             include_inactive_users=include_inactive,
-            encryption_enabled=not no_encryption,
-            compression_enabled=not no_compression,
+            encryption_enabled=(
+                not no_encryption and backup_config.get("encryption", {}).get("enabled", True)
+            ),
+            compression_enabled=(
+                storage_format.lower() == "binary"
+                and not no_compression
+                and backup_config.get("compression", {}).get("enabled", True)
+            ),
             skip_duplicate_check=skip_duplicate_check,
             delete_duplicates=delete_duplicates,
         )
@@ -239,7 +271,21 @@ def create_backup(
             raise typer.Exit(1)
 
         # Initialize managers
-        storage_engine = StorageEngine(backend=backend_instance)
+        compression_enabled = (
+            storage_format.lower() == "binary"
+            and not no_compression
+            and backup_config.get("compression", {}).get("enabled", True)
+        )
+        storage_engine = StorageEngine(
+            backend=backend_instance,
+            encryption_provider=(
+                ManagedAESEncryptionProvider() if backup_options.encryption_enabled else None
+            ),
+            enable_compression=compression_enabled,
+            storage_format=(
+                "binary" if compression_enabled or backup_options.encryption_enabled else "json"
+            ),
+        )
 
         # Create AWS client manager for the collector
         from ...aws_clients.manager import AWSClientManager
@@ -275,8 +321,9 @@ def create_backup(
             source_account = account_info.get("Account", "")
             console.print(f"[blue]Using AWS account: {source_account}[/blue]")
         except Exception as e:
-            console.print(f"[yellow]Warning: Could not determine AWS account ID: {e}[/yellow]")
-            source_account = "unknown"
+            raise ValueError(f"Could not determine AWS account ID: {e}") from e
+        if not source_account.isdigit() or len(source_account) != 12:
+            raise ValueError("STS returned an invalid AWS account ID")
 
         # Create backup manager with required collector, storage_engine, and instance_arn
         backup_manager = BackupManager(

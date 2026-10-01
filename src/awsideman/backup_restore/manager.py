@@ -159,7 +159,12 @@ class BackupManager(BackupManagerInterface):
 
                 # Get the most recent backup to compare against
                 try:
-                    recent_backups = await self.storage_engine.list_backups()
+                    recent_backups = [
+                        item
+                        for item in await self.storage_engine.list_backups()
+                        if item.source_account == self.source_account
+                        and item.instance_arn == self.instance_arn
+                    ]
                     if recent_backups:
                         # Sort by timestamp and get the most recent
                         recent_backups.sort(key=lambda x: x.timestamp, reverse=True)
@@ -783,7 +788,12 @@ class BackupManager(BackupManagerInterface):
         """
         try:
             # Get the most recent backup
-            recent_backups = await self.storage_engine.list_backups()
+            recent_backups = [
+                item
+                for item in await self.storage_engine.list_backups()
+                if item.source_account == self.source_account
+                and item.instance_arn == self.instance_arn
+            ]
             if not recent_backups:
                 logger.debug("No recent backups found for duplicate detection")
                 return None

@@ -17,20 +17,22 @@ awsideman backup create [OPTIONS]
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `--type` | `full\|incremental` | `full` | Backup type |
-| `--resource-types` | `list` | `all` | Specific resource types to backup |
+| `--resources` | `list` | `all` | Specific resource types to back up |
 | `--since` | `date` | - | Date for incremental backup (YYYY-MM-DD) |
-| `--description` | `string` | - | Human-readable description |
-| `--encryption-enabled` | `bool` | `true` | Enable encryption |
-| `--compression-enabled` | `bool` | `true` | Enable compression |
-| `--parallel-workers` | `int` | `8` | Number of parallel workers |
-| `--dry-run` | `flag` | `false` | Preview without execution |
-| `--verbose` | `flag` | `false` | Detailed output |
+| `--storage` | `filesystem\|s3` | configured value (`filesystem` fallback) | Storage backend |
+| `--storage-path` | `string` | configured value (`~/.awsideman/backups` filesystem fallback) | Filesystem directory or S3 bucket/prefix |
+| `--format` | `binary\|json` | `binary` | Stored data format; binary is gzip compressed JSON |
+| `--output-format` | `table\|json` | `table` | Terminal result format |
+| `--no-encryption` | `flag` | `false` | Disable encryption |
+| `--no-compression` | `flag` | `false` | Disable compression; encryption still applies |
+| `--include-inactive` | `flag` | `false` | Include inactive users |
+| `--profile` | `string` | active AWS profile | AWS credentials and Identity Center instance |
 
 #### Resource Types
 
 - `users` - User accounts and profiles
 - `groups` - Group definitions and memberships
-- `permission-sets` - Permission set configurations
+- `permission_sets` - Permission set configurations
 - `assignments` - Account assignments and mappings
 - `all` - All resource types (default)
 
@@ -44,14 +46,17 @@ awsideman backup create --type full
 awsideman backup create --type incremental --since 2024-01-01
 
 # Backup specific resources only
-awsideman backup create \
-    --type full \
-    --resource-types users,groups \
-    --description "User and group backup"
+awsideman backup create --resources users,groups
 
-# Dry run to preview
-awsideman backup create --type full --dry-run
+# Store readable JSON; use --output-format json for JSON terminal output
+awsideman backup create --format json --no-encryption --output-format json
 ```
+
+Filesystem backups are stored at
+`~/.awsideman/backups/<account-id>/<YYYY-MM-DD>/<backup-id>/` with `data` and
+`metadata.json` inside. The account ID comes from AWS STS. Existing backups under
+`profiles/<profile>/backups/<backup-id>/` remain readable. Binary storage uses
+gzip compressed JSON for efficient, portable backups; it does not use pickle.
 
 ### `backup list`
 
@@ -622,9 +627,9 @@ awsideman backup export <BACKUP_ID> [OPTIONS]
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `--format` | `json\|yaml\|csv` | `json` | Export format |
-| `--output` | `string` | - | Output file path |
-| `--resource-types` | `list` | `all` | Specific resource types |
-| `--include-metadata` | `flag` | `true` | Include backup metadata |
+| `--output-path`, `-o` | `string` | `<backup-id>.<format>` or `<backup-id>-csv` | Output file or CSV directory |
+| `--target` | `filesystem\|s3` | `filesystem` | Export destination |
+| `--profile` | `string` | active AWS profile | Profile for S3 or legacy backups |
 
 #### Examples
 
@@ -632,11 +637,14 @@ awsideman backup export <BACKUP_ID> [OPTIONS]
 # Export to JSON
 awsideman backup export backup-20241201-143022-abc123 --format json
 
-# Export specific resources to file
+# Export to a readable file
 awsideman backup export backup-20241201-143022-abc123 \
     --format yaml \
-    --output users-groups.yaml \
-    --resource-types users,groups
+    --output-path backup.yaml
+
+# Export one CSV per resource type plus metadata.csv
+awsideman backup export backup-20241201-143022-abc123 \
+    --format csv -o backup-csv
 ```
 
 ### `backup import`

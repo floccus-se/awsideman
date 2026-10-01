@@ -594,7 +594,7 @@ class BackupSerializer:
         """Initialize the backup serializer."""
         self.data_serializer = DataSerializer()
 
-    async def serialize(self, backup_data: BackupData) -> bytes:
+    async def serialize(self, backup_data: BackupData, compression: str = "gzip") -> bytes:
         """
         Serialize BackupData to bytes.
 
@@ -604,7 +604,7 @@ class BackupSerializer:
         Returns:
             Serialized bytes
         """
-        return self.data_serializer.serialize(backup_data)
+        return self.data_serializer.serialize(backup_data, compression=compression)
 
     async def deserialize(self, data: bytes) -> BackupData:
         """
@@ -616,4 +616,8 @@ class BackupSerializer:
         Returns:
             Deserialized BackupData object
         """
-        return self.data_serializer.deserialize(data, BackupData)
+        # Stored backups are JSON (possibly compressed). Never auto-detect pickle
+        # from a backup file, because unpickling untrusted data can execute code.
+        return self.data_serializer.deserialize(
+            data, BackupData, format_type=SerializationFormat.JSON
+        )

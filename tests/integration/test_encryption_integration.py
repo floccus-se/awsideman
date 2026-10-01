@@ -33,6 +33,11 @@ from src.awsideman.backup_restore.storage import StorageEngine
 class TestEncryptionIntegration:
     """Test encryption integration with backup storage system."""
 
+    @pytest.fixture(autouse=True)
+    def isolated_key_directory(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Keep fallback encryption keys inside each test's writable directory."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
     @pytest.fixture
     def temp_storage_dir(self):
         """Create temporary directory for storage tests."""
@@ -122,7 +127,12 @@ class TestEncryptionIntegration:
         assert backup_id == sample_backup_data.metadata.backup_id
 
         # Verify files were created
-        backup_dir = Path(temp_storage_dir) / "profiles" / "default" / "backups" / backup_id
+        backup_dir = (
+            Path(temp_storage_dir)
+            / "123456789012"
+            / sample_backup_data.metadata.timestamp.strftime("%Y-%m-%d")
+            / backup_id
+        )
         assert (backup_dir / "data").exists()
         assert (backup_dir / "metadata.json").exists()
 
@@ -164,7 +174,12 @@ class TestEncryptionIntegration:
         assert retrieved_backup.metadata.backup_id == backup_id
 
         # Verify that the stored data is encrypted by checking raw file
-        backup_dir = Path(temp_storage_dir) / "profiles" / "default" / "backups" / backup_id
+        backup_dir = (
+            Path(temp_storage_dir)
+            / "123456789012"
+            / sample_backup_data.metadata.timestamp.strftime("%Y-%m-%d")
+            / backup_id
+        )
         with open(backup_dir / "data", "rb") as f:
             raw_data = f.read()
 
@@ -230,7 +245,12 @@ class TestEncryptionIntegration:
 
         # Verify that the stored data is NOT encrypted by checking raw file
         # Note: Data might still be compressed, so we need to decompress first
-        backup_dir = Path(temp_storage_dir) / "profiles" / "default" / "backups" / backup_id
+        backup_dir = (
+            Path(temp_storage_dir)
+            / "123456789012"
+            / sample_backup_data.metadata.timestamp.strftime("%Y-%m-%d")
+            / backup_id
+        )
         with open(backup_dir / "data", "rb") as f:
             raw_data = f.read()
 

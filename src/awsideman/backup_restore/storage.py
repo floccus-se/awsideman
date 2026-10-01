@@ -20,6 +20,7 @@ try:
 except ImportError:
     HAS_BOTOCORE = False
 
+from .backends import FileSystemStorageBackend
 from .interfaces import EncryptionProviderInterface, StorageBackendInterface, StorageEngineInterface
 from .models import BackupData, BackupMetadata, ValidationResult
 from .serialization import BackupSerializer
@@ -40,6 +41,7 @@ class StorageEngine(StorageEngineInterface):
         backend: StorageBackendInterface,
         encryption_provider: Optional[EncryptionProviderInterface] = None,
         enable_compression: bool = True,
+        storage_format: str = "binary",
     ):
         """
         Initialize storage engine.
@@ -48,10 +50,14 @@ class StorageEngine(StorageEngineInterface):
             backend: Storage backend implementation
             encryption_provider: Optional encryption provider
             enable_compression: Whether to enable compression
+            storage_format: Binary gzip JSON (default) or readable JSON
         """
         self.backend = backend
         self.encryption_provider = encryption_provider
-        self.enable_compression = enable_compression
+        if storage_format not in {"binary", "json"}:
+            raise ValueError("Storage format must be binary or json")
+        self.enable_compression = enable_compression and storage_format == "binary"
+        self.storage_format = storage_format
         self.serializer = BackupSerializer()
 
     async def store_backup(self, backup_data: BackupData) -> str:
@@ -71,8 +77,15 @@ class StorageEngine(StorageEngineInterface):
             backup_id = backup_data.metadata.backup_id
             logger.info(f"Storing backup {backup_id}")
 
+            if isinstance(self.backend, FileSystemStorageBackend):
+                self.backend.set_backup_location(
+                    backup_data.metadata.source_account,
+                    backup_data.metadata.timestamp,
+                    backup_id,
+                )
+
             # Serialize backup data
-            serialized_data = await self.serializer.serialize(backup_data)
+            serialized_data = await self.serializer.serialize(backup_data, compression="none")
 
             # Compress if enabled
             if self.enable_compression:
@@ -101,6 +114,7 @@ class StorageEngine(StorageEngineInterface):
             metadata_dict = backup_data.metadata.to_dict()
             metadata_dict["encryption_metadata"] = encryption_metadata
             metadata_dict["compressed"] = self.enable_compression
+            metadata_dict["storage_format"] = self.storage_format
             metadata_dict["final_checksum"] = final_checksum
 
             metadata_json = json.dumps(metadata_dict, indent=2, default=str)
@@ -155,7 +169,11 @@ class StorageEngine(StorageEngineInterface):
 
             # Decrypt if needed
             encryption_metadata = metadata_dict.get("encryption_metadata", {})
-            if encryption_metadata and self.encryption_provider:
+            if encryption_metadata:
+                if self.encryption_provider is None:
+                    from .encryption import ManagedAESEncryptionProvider
+
+                    self.encryption_provider = ManagedAESEncryptionProvider()
                 data_bytes = await self.encryption_provider.decrypt(data_bytes, encryption_metadata)
                 logger.debug(f"Decrypted backup data for {backup_id}")
 
@@ -204,7 +222,12 @@ class StorageEngine(StorageEngineInterface):
                     if metadata_bytes:
                         metadata_dict = json.loads(metadata_bytes.decode())
                         # Remove storage-specific fields before creating BackupMetadata
-                        storage_fields = ["encryption_metadata", "compressed", "final_checksum"]
+                        storage_fields = [
+                            "encryption_metadata",
+                            "compressed",
+                            "final_checksum",
+                            "storage_format",
+                        ]
                         for field in storage_fields:
                             metadata_dict.pop(field, None)
 

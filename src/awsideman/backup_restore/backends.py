@@ -7,6 +7,7 @@ filesystem and S3 storage with proper error handling and metadata support.
 
 import logging
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -42,20 +43,53 @@ class FileSystemStorageBackend(StorageBackendInterface):
         Args:
             base_path: Base directory path for storing backups
             create_dirs: Whether to create directories if they don't exist
-            profile: AWS profile name for isolation
+            profile: AWS profile name used when locating legacy backups
         """
-        self.base_path = Path(base_path)
+        self.base_path = Path(base_path).expanduser()
         self.create_dirs = create_dirs
         self.profile = profile
-
-        # Add profile isolation
-        profile_name = profile or "default"
-        self.base_path = self.base_path / "profiles" / profile_name
+        self._write_backup_prefix: Optional[str] = None
 
         if create_dirs:
             self.base_path.mkdir(parents=True, exist_ok=True)
 
         logger.info(f"Initialized filesystem storage at {self.base_path}")
+
+    def set_backup_location(self, account_id: str, timestamp: datetime, backup_id: str) -> None:
+        """Place the next backup under account/date/id instead of the legacy profile tree."""
+        if not account_id.isdigit() or len(account_id) != 12:
+            raise ValueError("A 12-digit AWS account ID is required for filesystem backups")
+        if not backup_id or "/" in backup_id or ".." in backup_id:
+            raise ValueError("Invalid backup ID")
+        self._write_backup_prefix = f"{account_id}/{timestamp:%Y-%m-%d}/{backup_id}"
+
+    def _path_for_key(self, key: str, writing: bool = False) -> Path:
+        """Resolve logical backup keys, including backups created by older versions."""
+        parts = key.split("/")
+        if ".." in parts or key.startswith("/"):
+            raise ValueError("Invalid storage key")
+        if len(parts) == 3 and parts[0] == "backups":
+            _, backup_id, filename = parts
+            if not re.fullmatch(r"[A-Za-z0-9_.-]+", backup_id) or ".." in backup_id:
+                raise ValueError("Invalid backup ID")
+            if writing and self._write_backup_prefix:
+                return self.base_path / self._write_backup_prefix / filename
+            matches = list(self.base_path.glob(f"*/????-??-??/{backup_id}/{filename}"))
+            if self.profile:
+                if "/" in self.profile or ".." in self.profile:
+                    raise ValueError("Invalid profile name")
+                legacy_path = (
+                    self.base_path / "profiles" / self.profile / "backups" / backup_id / filename
+                )
+                if legacy_path.exists():
+                    matches.append(legacy_path)
+            else:
+                matches += list(self.base_path.glob(f"profiles/*/backups/{backup_id}/{filename}"))
+            if len(matches) > 1:
+                raise ValueError(f"Ambiguous backup ID: {backup_id}")
+            if matches:
+                return matches[0]
+        return self.base_path / key
 
     async def write_data(self, key: str, data: bytes) -> bool:
         """
@@ -69,7 +103,7 @@ class FileSystemStorageBackend(StorageBackendInterface):
             True if write was successful, False otherwise
         """
         try:
-            file_path = self.base_path / key
+            file_path = self._path_for_key(key, writing=True)
 
             # Create parent directories if needed
             if self.create_dirs:
@@ -90,7 +124,7 @@ class FileSystemStorageBackend(StorageBackendInterface):
         except Exception as e:
             logger.error(f"Failed to write data to {key}: {e}")
             # Clean up temporary file if it exists
-            temp_path = self.base_path / key
+            temp_path = self._path_for_key(key, writing=True)
             temp_path = temp_path.with_suffix(temp_path.suffix + ".tmp")
             if temp_path.exists():
                 try:
@@ -110,7 +144,7 @@ class FileSystemStorageBackend(StorageBackendInterface):
             Raw data if found, None otherwise
         """
         try:
-            file_path = self.base_path / key
+            file_path = self._path_for_key(key)
 
             if not file_path.exists():
                 logger.debug(f"File not found: {key}")
@@ -137,7 +171,7 @@ class FileSystemStorageBackend(StorageBackendInterface):
             True if deletion was successful, False otherwise
         """
         try:
-            file_path = self.base_path / key
+            file_path = self._path_for_key(key)
 
             if not file_path.exists():
                 logger.debug(f"File not found for deletion: {key}")
@@ -179,7 +213,7 @@ class FileSystemStorageBackend(StorageBackendInterface):
             keys = []
             search_path = self.base_path
 
-            if prefix:
+            if prefix and prefix != "backups/":
                 search_path = self.base_path / prefix
                 if not search_path.exists():
                     return []
@@ -192,7 +226,22 @@ class FileSystemStorageBackend(StorageBackendInterface):
                     key = str(relative_path).replace(os.sep, "/")
 
                     # Apply prefix filter if specified
-                    if prefix is None or key.startswith(prefix):
+                    is_backup = (
+                        key.startswith("backups/")
+                        or re.fullmatch(
+                            r"\d{12}/\d{4}-\d{2}-\d{2}/[A-Za-z0-9_.-]+/(data|metadata\.json)",
+                            key,
+                        )
+                        or re.fullmatch(
+                            r"profiles/[^/]+/backups/[A-Za-z0-9_.-]+/(data|metadata\.json)",
+                            key,
+                        )
+                    )
+                    if (
+                        prefix is None
+                        or (prefix == "backups/" and is_backup)
+                        or key.startswith(prefix)
+                    ):
                         keys.append(key)
 
             logger.debug(f"Found {len(keys)} keys with prefix '{prefix}'")
@@ -213,7 +262,7 @@ class FileSystemStorageBackend(StorageBackendInterface):
             True if data exists, False otherwise
         """
         try:
-            file_path = self.base_path / key
+            file_path = self._path_for_key(key)
             return file_path.exists() and file_path.is_file()
         except Exception as e:
             logger.error(f"Failed to check existence of {key}: {e}")
@@ -230,7 +279,7 @@ class FileSystemStorageBackend(StorageBackendInterface):
             Metadata dictionary if found, None otherwise
         """
         try:
-            file_path = self.base_path / key
+            file_path = self._path_for_key(key)
 
             if not file_path.exists():
                 return None
